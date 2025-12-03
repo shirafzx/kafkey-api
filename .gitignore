@@ -1,1 +1,46 @@
+########################
+# Rust / Cargo
+########################
+
+# Build output
 /target
+
+# Cargo lockfile (include it if building an app; ignore if you want reproducible libraries)
+# For most API projects you SHOULD commit Cargo.lock — so comment out if needed
+# Cargo.lock
+
+# Rust tool artifacts
+**/*.rs.bk
+
+########################
+# Runtime / Local Files
+########################
+
+# Environment variables (common for APIs)
+.env
+.env.*
+!.env.example
+
+# Log files
+*.log
+
+# Temp data
+tmp/
+*.tmp
+
+########################
+# IDE / Editor Settings
+########################
+
+# VSCode
+.vscode/
+
+########################
+# OS-Specific
+########################
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
