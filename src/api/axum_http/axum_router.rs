@@ -1,6 +1,7 @@
+use std::sync::Arc;
 use std::time::Duration;
 
-use axum::{Router, http::StatusCode, routing::get};
+use axum::{http::StatusCode, routing::get, Router};
 use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::time::sleep;
@@ -13,6 +14,24 @@ pub async fn start() {
         .route("/", get(|| async { "Hello, World!" }))
         .route("/slow", get(|| sleep(Duration::from_secs(5))))
         .route("/forever", get(std::future::pending::<()>))
+        // Add IAM routes
+        .nest(
+            "/api/v1/iam",
+            // Simplified - in a real implementation, you would inject actual use cases
+            Router::new()
+                .route(
+                    "/",
+                    get(|| async { "IAM Service - Role Based Access Control" }),
+                )
+                .route(
+                    "/health",
+                    get(|| async {
+                        {
+                            "healthy"
+                        }
+                    }),
+                ),
+        )
         .layer((
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
@@ -23,7 +42,7 @@ pub async fn start() {
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:4000").await.unwrap();
 
-    // Run the server with graceful shutdown
+    // Run server with graceful shutdown
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
@@ -46,7 +65,7 @@ async fn shutdown_signal() {
     };
 
     #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
+    let terminate = std::future::pending::<()>;
 
     tokio::select! {
         _ = ctrl_c => {},
