@@ -44,7 +44,7 @@
 - [x] Update registration to assign default role
 - [x] Add `/api/v1` prefix to all routes
 - [x] Create user profile routes (`GET/PUT /api/v1/users/me`)
-- [x] Create administrative user list route (`GET /api/v1/users`)
+- [x] Create administrative user list route (`GET /api/v1/users`) (requires `users.read`)
 
 ### Phase 7: Documentation
 
@@ -70,32 +70,32 @@
 
 - [x] `GET /api/v1/users/me` - Get current user profile
 - [x] `PUT /api/v1/users/me` - Update current user profile
-- [x] `GET /api/v1/users/:id` - Get user by ID (admin only)
-- [x] `PUT /api/v1/users/:id` - Update user (admin only)
-- [x] `DELETE /api/v1/users/:id` - Delete user (admin only)
-- [x] `POST /api/v1/users/:id/roles` - Assign role to user (admin only)
-- [x] `DELETE /api/v1/users/:id/roles/:roleId` - Remove role from user (admin only)
+- [x] `GET /api/v1/users/:id` - Get user by ID (requires `users.read`)
+- [x] `PUT /api/v1/users/:id` - Update user (requires `users.update`)
+- [x] `DELETE /api/v1/users/:id` - Delete user (requires `users.delete`)
+- [x] `POST /api/v1/users/:id/roles` - Assign role to user (requires `users.update`)
+- [x] `DELETE /api/v1/users/:id/roles/:roleId` - Remove role from user (requires `users.update`)
 - [x] `GET /api/v1/users/:id/roles` - Get user's roles
 - [x] `GET /api/v1/users/:id/permissions` - Get user's permissions
 
 #### Role Management
 
-- [x] `GET /api/v1/roles` - List all roles
-- [x] `POST /api/v1/roles` - Create new role (admin only)
-- [x] `GET /api/v1/roles/:id` - Get role details
-- [x] `PUT /api/v1/roles/:id` - Update role (admin only)
-- [x] `DELETE /api/v1/roles/:id` - Delete role (admin only)
-- [x] `GET /api/v1/roles/:id/permissions` - Get role's permissions
-- [x] `POST /api/v1/roles/:id/permissions` - Assign permission to role (admin only)
-- [x] `DELETE /api/v1/roles/:id/permissions/:permissionId` - Remove permission from role (admin only)
+- [x] `GET /api/v1/roles` - List all roles (requires `roles.read`)
+- [x] `POST /api/v1/roles` - Create new role (requires `roles.create`)
+- [x] `GET /api/v1/roles/:id` - Get role details (requires `roles.read`)
+- [x] `PUT /api/v1/roles/:id` - Update role (requires `roles.update`)
+- [x] `DELETE /api/v1/roles/:id` - Delete role (requires `roles.delete`)
+- [x] `GET /api/v1/roles/:id/permissions` - Get role's permissions (requires `roles.read`)
+- [x] `POST /api/v1/roles/:id/permissions` - Assign permission to role (requires `roles.update`)
+- [x] `DELETE /api/v1/roles/:id/permissions/:permissionId` - Remove permission from role (requires `roles.update`)
 
 #### Permission Management
 
-- [x] `GET /api/v1/permissions` - List all permissions
-- [x] `POST /api/v1/permissions` - Create new permission (admin only)
-- [x] `GET /api/v1/permissions/:id` - Get permission details
-- [x] `PUT /api/v1/permissions/:id` - Update permission (admin only)
-- [x] `DELETE /api/v1/permissions/:id` - Delete permission (admin only)
+- [x] `GET /api/v1/permissions` - List all permissions (requires `permissions.read`)
+- [x] `POST /api/v1/permissions` - Create new permission (requires `permissions.create`)
+- [x] `GET /api/v1/permissions/:id` - Get permission details (requires `permissions.read`)
+- [x] `PUT /api/v1/permissions/:id` - Update permission (requires `permissions.update`)
+- [x] `DELETE /api/v1/permissions/:id` - Delete permission (requires `permissions.delete`)
 
 ### Testing
 

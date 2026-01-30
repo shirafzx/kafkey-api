@@ -42,6 +42,13 @@ where
         self.user_repository.get_user_roles(user_id).await
     }
 
+    pub async fn get_user_permissions(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<crate::domain::entities::permission::PermissionEntity>> {
+        self.user_repository.get_user_permissions(user_id).await
+    }
+
     pub async fn update_user_profile(
         &self,
         user_id: Uuid,

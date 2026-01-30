@@ -18,7 +18,9 @@ use crate::{
     services::jwt_service::TokenClaims,
 };
 
-use crate::api::axum_http::dtos::{AdminUpdateUserRequest, UserResponse};
+use crate::api::axum_http::dtos::{
+    AdminUpdateUserRequest, PermissionResponse, RoleResponse, UserResponse,
+};
 use crate::api::axum_http::middleware::require_permission;
 
 pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
@@ -52,10 +54,12 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
                 require_permission("users.delete".to_string(), req, next)
             })),
         )
-        // Note: Update/Delete routes are bundled in the same .layer above.
-        // For even more granularity, we could split them, but users.read for GET
-        // and using a broader permission or specific ones for PUT/DELETE is standard.
-        // Actually, let's be fully granular as per the plan.
+        .route(
+            "/api/v1/users/:id/roles",
+            get(get_user_roles).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("users.read".to_string(), req, next)
+            })),
+        )
         .route(
             "/api/v1/users/:id/roles",
             post(assign_role).layer(axum::middleware::from_fn(|req, next| {
@@ -66,6 +70,12 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
             "/api/v1/users/:id/roles/:role_id",
             delete(remove_role).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.update".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/users/:id/permissions",
+            get(get_user_permissions).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("users.read".to_string(), req, next)
             })),
         )
         .with_state(user_use_case)
@@ -225,6 +235,48 @@ async fn remove_role(
             Json(serde_json::json!({ "message": "Role removed successfully" })),
         )
             .into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn get_user_roles(
+    Path(user_id): Path<Uuid>,
+    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+) -> impl IntoResponse {
+    match user_use_case.get_user_roles(user_id).await {
+        Ok(roles) => {
+            let response: Vec<RoleResponse> = roles
+                .into_iter()
+                .map(|r| RoleResponse {
+                    id: r.id.to_string(),
+                    name: r.name,
+                    description: r.description,
+                })
+                .collect();
+            (StatusCode::OK, Json(response)).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn get_user_permissions(
+    Path(user_id): Path<Uuid>,
+    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+) -> impl IntoResponse {
+    match user_use_case.get_user_permissions(user_id).await {
+        Ok(perms) => {
+            let response: Vec<PermissionResponse> = perms
+                .into_iter()
+                .map(|p| PermissionResponse {
+                    id: p.id.to_string(),
+                    name: p.name,
+                    resource: p.resource,
+                    action: p.action,
+                    description: p.description,
+                })
+                .collect();
+            (StatusCode::OK, Json(response)).into_response()
+        }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
