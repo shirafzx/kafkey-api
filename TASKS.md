@@ -104,8 +104,8 @@
 
 ### Security Enhancements
 
-- [ ] Add rate limiting for authentication endpoints
-- [ ] Implement token blacklist for logout functionality
+- [x] Add global rate limiting for all endpoints
+- [x] Implement token blacklist for logout functionality
 - [ ] Add account lockout after failed login attempts
 - [ ] Implement email verification flow
 - [ ] Add password reset functionality

@@ -14,6 +14,7 @@ use tracing::info;
 
 use crate::api::axum_http::{default_routers, middleware, routers};
 use crate::config::{config_loader, config_model::DotEnvyConfig};
+use crate::domain::repositories::blacklist_repository::BlacklistRepository;
 use crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad;
 use crate::services::jwt_service::JwtService;
 
@@ -31,6 +32,24 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
             Arc::clone(&db_pool),
         ),
     );
+
+    // Spawn background task for token blacklist cleanup
+    let cleanup_repo = Arc::clone(&blacklist_repository);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(3600)); // Every 1 hour
+        loop {
+            interval.tick().await;
+            info!("Running background cleanup for expired blacklisted tokens...");
+            match cleanup_repo.cleanup_expired().await {
+                Ok(deleted) => info!("Cleaned up {} expired tokens", deleted),
+                Err(e) => tracing::error!("Failed to cleanup expired tokens: {}", e),
+            }
+        }
+    });
+
+    // Initialize Rate Limit setup
+    let rate_limit_config = middleware::rate_limit_middleware::RateLimitConfig::default();
+    let rate_limit_state = middleware::rate_limit_middleware::RateLimitState::new();
 
     let app = Router::new()
         .fallback(default_routers::not_found)
@@ -52,6 +71,18 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
                 })),
         )
         .route("/health-check", get(default_routers::health_check))
+        .layer(axum::middleware::from_fn(move |req, next| {
+            let state = Arc::clone(&rate_limit_state);
+            async move {
+                middleware::rate_limit_middleware::rate_limit_middleware(
+                    rate_limit_config,
+                    state,
+                    req,
+                    next,
+                )
+                .await
+            }
+        }))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(config.server.timeout),
