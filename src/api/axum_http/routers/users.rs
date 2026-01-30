@@ -19,7 +19,7 @@ use crate::{
 };
 
 use crate::api::axum_http::dtos::{AdminUpdateUserRequest, UserResponse};
-use crate::api::axum_http::middleware::require_role;
+use crate::api::axum_http::middleware::require_permission;
 
 pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
     let user_repository = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
@@ -31,28 +31,41 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
         .route(
             "/api/v1/users",
             get(list_users).layer(axum::middleware::from_fn(|req, next| {
-                require_role("admin".to_string(), req, next)
+                require_permission("users.read".to_string(), req, next)
             })),
         )
         .route(
             "/api/v1/users/:id",
-            get(get_user_by_id)
-                .put(admin_update_user)
-                .delete(delete_user)
-                .layer(axum::middleware::from_fn(|req, next| {
-                    require_role("admin".to_string(), req, next)
-                })),
+            get(get_user_by_id).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("users.read".to_string(), req, next)
+            })),
         )
+        .route(
+            "/api/v1/users/:id",
+            put(admin_update_user).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("users.update".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/users/:id",
+            delete(delete_user).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("users.delete".to_string(), req, next)
+            })),
+        )
+        // Note: Update/Delete routes are bundled in the same .layer above.
+        // For even more granularity, we could split them, but users.read for GET
+        // and using a broader permission or specific ones for PUT/DELETE is standard.
+        // Actually, let's be fully granular as per the plan.
         .route(
             "/api/v1/users/:id/roles",
             post(assign_role).layer(axum::middleware::from_fn(|req, next| {
-                require_role("admin".to_string(), req, next)
+                require_permission("users.update".to_string(), req, next)
             })),
         )
         .route(
             "/api/v1/users/:id/roles/:role_id",
             delete(remove_role).layer(axum::middleware::from_fn(|req, next| {
-                require_role("admin".to_string(), req, next)
+                require_permission("users.update".to_string(), req, next)
             })),
         )
         .with_state(user_use_case)

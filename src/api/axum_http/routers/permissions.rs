@@ -10,10 +10,11 @@ use uuid::Uuid;
 
 use crate::{
     api::axum_http::dtos::{CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest},
-    api::axum_http::middleware::require_role,
+    api::axum_http::middleware::require_permission,
     application::use_cases::permissions::PermissionUseCases,
     infrastructure::database::postgres::repositories::permission_repository::PermissionPostgres,
 };
+use axum::routing::{delete, post, put};
 
 pub fn routes(
     db_pool: Arc<crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad>,
@@ -24,20 +25,33 @@ pub fn routes(
     Router::new()
         .route(
             "/api/v1/permissions",
-            get(list_permissions)
-                .post(create_permission)
-                .layer(axum::middleware::from_fn(|req, next| {
-                    require_role("admin".to_string(), req, next)
-                })),
+            get(list_permissions).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("permissions.read".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/permissions",
+            post(create_permission).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("permissions.create".to_string(), req, next)
+            })),
         )
         .route(
             "/api/v1/permissions/:id",
-            get(get_permission_by_id)
-                .put(update_permission)
-                .delete(delete_permission)
-                .layer(axum::middleware::from_fn(|req, next| {
-                    require_role("admin".to_string(), req, next)
-                })),
+            get(get_permission_by_id).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("permissions.read".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/permissions/:id",
+            put(update_permission).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("permissions.update".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/permissions/:id",
+            delete(delete_permission).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("permissions.delete".to_string(), req, next)
+            })),
         )
         .with_state(permission_use_case)
 }

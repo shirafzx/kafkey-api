@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get},
+    routing::{delete, get, post, put},
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -12,7 +12,7 @@ use crate::{
     api::axum_http::dtos::{
         CreateRoleRequest, PermissionResponse, RoleResponse, UpdateRoleRequest,
     },
-    api::axum_http::middleware::require_role,
+    api::axum_http::middleware::require_permission,
     application::use_cases::roles::RoleUseCases,
     infrastructure::database::postgres::repositories::role_repository::RolePostgres,
 };
@@ -26,33 +26,50 @@ pub fn routes(
     Router::new()
         .route(
             "/api/v1/roles",
-            get(list_roles)
-                .post(create_role)
-                .layer(axum::middleware::from_fn(|req, next| {
-                    require_role("admin".to_string(), req, next)
-                })),
+            get(list_roles).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.read".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/roles",
+            post(create_role).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.create".to_string(), req, next)
+            })),
         )
         .route(
             "/api/v1/roles/:id",
-            get(get_role_by_id)
-                .put(update_role)
-                .delete(delete_role)
-                .layer(axum::middleware::from_fn(|req, next| {
-                    require_role("admin".to_string(), req, next)
-                })),
+            get(get_role_by_id).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.read".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/roles/:id",
+            put(update_role).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.update".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/roles/:id",
+            delete(delete_role).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.delete".to_string(), req, next)
+            })),
         )
         .route(
             "/api/v1/roles/:id/permissions",
-            get(get_role_permissions)
-                .post(assign_permission)
-                .layer(axum::middleware::from_fn(|req, next| {
-                    require_role("admin".to_string(), req, next)
-                })),
+            get(get_role_permissions).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.read".to_string(), req, next)
+            })),
+        )
+        .route(
+            "/api/v1/roles/:id/permissions",
+            post(assign_permission).layer(axum::middleware::from_fn(|req, next| {
+                require_permission("roles.update".to_string(), req, next)
+            })),
         )
         .route(
             "/api/v1/roles/:id/permissions/:permission_id",
             delete(remove_permission).layer(axum::middleware::from_fn(|req, next| {
-                require_role("admin".to_string(), req, next)
+                require_permission("roles.update".to_string(), req, next)
             })),
         )
         .with_state(role_use_case)
