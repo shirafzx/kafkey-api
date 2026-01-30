@@ -43,6 +43,8 @@
 - [x] Create authentication routes (login, refresh token)
 - [x] Update registration to assign default role
 - [x] Add `/api/v1` prefix to all routes
+- [x] Create user profile routes (`GET/PUT /api/v1/users/me`)
+- [x] Create administrative user list route (`GET /api/v1/users`)
 
 ### Phase 7: Documentation
 
@@ -57,55 +59,48 @@
 
 ### Authentication & Authorization
 
-- [ ] Create authentication middleware to extract JWT from requests
-- [ ] Create authorization middleware (check roles/permissions)
-- [ ] Add `RequireRole` guard for role-based access
-- [ ] Add `RequirePermission` guard for permission-based access
+- [x] Create authentication middleware to extract JWT from requests
+- [x] Create authorization middleware (check roles/permissions)
+- [x] Add `RequireRole` guard for role-based access
+- [x] Add `RequirePermission` guard for permission-based access
 
 ### API Layer - Additional Routes
 
-#### User Management
+### User Management
 
-- [ ] `GET /api/v1/users/me` - Get current user profile
-- [ ] `PUT /api/v1/users/me` - Update current user profile
-- [ ] `GET /api/v1/users/:id` - Get user by ID (admin only)
-- [ ] `PUT /api/v1/users/:id` - Update user (admin only)
-- [ ] `DELETE /api/v1/users/:id` - Delete user (admin only)
-- [ ] `POST /api/v1/users/:id/roles` - Assign role to user (admin only)
-- [ ] `DELETE /api/v1/users/:id/roles/:roleId` - Remove role from user (admin only)
-- [ ] `GET /api/v1/users/:id/roles` - Get user's roles
-- [ ] `GET /api/v1/users/:id/permissions` - Get user's permissions
+- [x] `GET /api/v1/users/me` - Get current user profile
+- [x] `PUT /api/v1/users/me` - Update current user profile
+- [x] `GET /api/v1/users/:id` - Get user by ID (admin only)
+- [x] `PUT /api/v1/users/:id` - Update user (admin only)
+- [x] `DELETE /api/v1/users/:id` - Delete user (admin only)
+- [x] `POST /api/v1/users/:id/roles` - Assign role to user (admin only)
+- [x] `DELETE /api/v1/users/:id/roles/:roleId` - Remove role from user (admin only)
+- [x] `GET /api/v1/users/:id/roles` - Get user's roles
+- [x] `GET /api/v1/users/:id/permissions` - Get user's permissions
 
 #### Role Management
 
-- [ ] `GET /api/v1/roles` - List all roles
-- [ ] `POST /api/v1/roles` - Create new role (admin only)
-- [ ] `GET /api/v1/roles/:id` - Get role details
-- [ ] `PUT /api/v1/roles/:id` - Update role (admin only)
-- [ ] `DELETE /api/v1/roles/:id` - Delete role (admin only)
-- [ ] `GET /api/v1/roles/:id/permissions` - Get role's permissions
-- [ ] `POST /api/v1/roles/:id/permissions` - Assign permission to role (admin only)
-- [ ] `DELETE /api/v1/roles/:id/permissions/:permissionId` - Remove permission from role (admin only)
+- [x] `GET /api/v1/roles` - List all roles
+- [x] `POST /api/v1/roles` - Create new role (admin only)
+- [x] `GET /api/v1/roles/:id` - Get role details
+- [x] `PUT /api/v1/roles/:id` - Update role (admin only)
+- [x] `DELETE /api/v1/roles/:id` - Delete role (admin only)
+- [x] `GET /api/v1/roles/:id/permissions` - Get role's permissions
+- [x] `POST /api/v1/roles/:id/permissions` - Assign permission to role (admin only)
+- [x] `DELETE /api/v1/roles/:id/permissions/:permissionId` - Remove permission from role (admin only)
 
 #### Permission Management
 
-- [ ] `GET /api/v1/permissions` - List all permissions
-- [ ] `POST /api/v1/permissions` - Create new permission (admin only)
-- [ ] `GET /api/v1/permissions/:id` - Get permission details
-- [ ] `PUT /api/v1/permissions/:id` - Update permission (admin only)
-- [ ] `DELETE /api/v1/permissions/:id` - Delete permission (admin only)
+- [x] `GET /api/v1/permissions` - List all permissions
+- [x] `POST /api/v1/permissions` - Create new permission (admin only)
+- [x] `GET /api/v1/permissions/:id` - Get permission details
+- [x] `PUT /api/v1/permissions/:id` - Update permission (admin only)
+- [x] `DELETE /api/v1/permissions/:id` - Delete permission (admin only)
 
 ### Testing
 
-- [ ] Write unit tests for domain entities
-- [ ] Write unit tests for use cases
-- [ ] Write unit tests for JWT service
-- [ ] Write unit tests for password service
-- [ ] Write integration tests for authentication flow
-- [ ] Write integration tests for role management
-- [ ] Write integration tests for permission management
-- [ ] Test role-based access control in routes
-- [ ] Test permission-based access control in routes
+- [x] Test role-based access control in routes
+- [x] Test permission-based access control in routes
 
 ### Security Enhancements
 

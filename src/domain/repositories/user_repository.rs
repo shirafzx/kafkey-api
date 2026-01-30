@@ -29,6 +29,15 @@ pub trait UserRepository {
         avatar_image_url: Option<String>,
     ) -> Result<()>;
 
+    async fn admin_update(
+        &self,
+        user_id: Uuid,
+        display_name: Option<String>,
+        avatar_image_url: Option<String>,
+        is_active: Option<bool>,
+        is_verified: Option<bool>,
+    ) -> Result<()>;
+
     async fn find_all(&self) -> Result<Vec<UserEntity>>;
     async fn delete(&self, id: Uuid) -> Result<()>;
 }

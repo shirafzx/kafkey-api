@@ -25,6 +25,13 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
         auth_secrets.refresh_secret,
     ));
 
+    // Initialize Blacklist repository
+    let blacklist_repository = Arc::new(
+        crate::infrastructure::database::postgres::repositories::blacklist_repository::BlacklistPostgres::new(
+            Arc::clone(&db_pool),
+        ),
+    );
+
     let app = Router::new()
         .fallback(default_routers::not_found)
         .merge(routers::authentication::routes(
@@ -32,12 +39,17 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
             Arc::clone(&jwt_service),
         ))
         .merge(
-            routers::users::routes(Arc::clone(&db_pool)).layer(axum::middleware::from_fn(
-                move |req, next| {
+            routers::users::routes(Arc::clone(&db_pool))
+                .merge(routers::roles::routes(Arc::clone(&db_pool)))
+                .merge(routers::permissions::routes(Arc::clone(&db_pool)))
+                .layer(axum::middleware::from_fn(move |req, next| {
                     let jwt_service = Arc::clone(&jwt_service);
-                    async move { middleware::auth_middleware(jwt_service, req, next).await }
-                },
-            )),
+                    let blacklist_repository = Arc::clone(&blacklist_repository);
+                    async move {
+                        middleware::auth_middleware(jwt_service, blacklist_repository, req, next)
+                            .await
+                    }
+                })),
         )
         .route("/health-check", get(default_routers::health_check))
         .layer(TimeoutLayer::with_status_code(

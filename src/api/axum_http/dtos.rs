@@ -58,3 +58,55 @@ pub struct UpdateProfileRequest {
     pub display_name: Option<String>,
     pub avatar_image_url: Option<String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct AdminUpdateUserRequest {
+    pub display_name: Option<String>,
+    pub avatar_image_url: Option<String>,
+    pub is_active: Option<bool>,
+    pub is_verified: Option<bool>,
+}
+
+// Role DTOs
+#[derive(Debug, Deserialize)]
+pub struct CreateRoleRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateRoleRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RoleResponse {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+// Permission DTOs
+#[derive(Debug, Deserialize)]
+pub struct CreatePermissionRequest {
+    pub name: String,
+    pub resource: String,
+    pub action: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePermissionRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PermissionResponse {
+    pub id: String,
+    pub name: String,
+    pub resource: String,
+    pub action: String,
+    pub description: Option<String>,
+}

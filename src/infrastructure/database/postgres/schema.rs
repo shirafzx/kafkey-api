@@ -1,6 +1,14 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    blacklisted_tokens (jti) {
+        jti -> Uuid,
+        expires_at -> Timestamptz,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     permissions (id) {
         id -> Uuid,
         #[max_length = 100]
@@ -69,6 +77,7 @@ diesel::joinable!(user_roles -> roles (role_id));
 diesel::joinable!(user_roles -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    blacklisted_tokens,
     permissions,
     role_permissions,
     roles,

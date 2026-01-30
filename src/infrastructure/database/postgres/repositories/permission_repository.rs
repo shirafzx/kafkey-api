@@ -54,12 +54,56 @@ impl PermissionRepository for PermissionPostgres {
         Ok(result)
     }
 
-    async fn list_all(&self) -> Result<Vec<PermissionEntity>> {
+    async fn find_all(&self) -> Result<Vec<PermissionEntity>> {
         let mut conn = Arc::clone(&self.db_pool).get()?;
         let results = permissions::table
             .select(PermissionEntity::as_select())
             .load::<PermissionEntity>(&mut conn)?;
 
         Ok(results)
+    }
+
+    async fn update(
+        &self,
+        permission_id: Uuid,
+        name_opt: Option<String>,
+        description_opt: Option<String>,
+    ) -> Result<()> {
+        use crate::infrastructure::database::postgres::schema::permissions::dsl::*;
+
+        let pool = Arc::clone(&self.db_pool);
+
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+
+            conn.transaction::<_, anyhow::Error, _>(|conn| {
+                if let Some(n) = name_opt {
+                    diesel::update(permissions.filter(id.eq(permission_id)))
+                        .set(name.eq(n))
+                        .execute(conn)?;
+                }
+
+                if let Some(desc) = description_opt {
+                    diesel::update(permissions.filter(id.eq(permission_id)))
+                        .set(description.eq(Some(desc)))
+                        .execute(conn)?;
+                }
+
+                Ok(())
+            })?;
+
+            Ok(())
+        })
+        .await??;
+
+        Ok(())
+    }
+
+    async fn delete(&self, permission_id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        diesel::delete(permissions::table.filter(permissions::id.eq(permission_id)))
+            .execute(&mut conn)?;
+
+        Ok(())
     }
 }

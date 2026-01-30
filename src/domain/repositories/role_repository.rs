@@ -15,4 +15,12 @@ pub trait RoleRepository {
     async fn assign_permission(&self, role_id: Uuid, permission_id: Uuid) -> Result<()>;
     async fn remove_permission(&self, role_id: Uuid, permission_id: Uuid) -> Result<()>;
     async fn get_permissions(&self, role_id: Uuid) -> Result<Vec<PermissionEntity>>;
+    async fn find_all(&self) -> Result<Vec<RoleEntity>>;
+    async fn update(
+        &self,
+        id: Uuid,
+        name: Option<String>,
+        description: Option<String>,
+    ) -> Result<()>;
+    async fn delete(&self, id: Uuid) -> Result<()>;
 }

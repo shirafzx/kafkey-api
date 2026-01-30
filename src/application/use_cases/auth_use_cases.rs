@@ -3,33 +3,41 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    domain::repositories::{role_repository::RoleRepository, user_repository::UserRepository},
+    domain::repositories::{
+        blacklist_repository::BlacklistRepository, role_repository::RoleRepository,
+        user_repository::UserRepository,
+    },
     services::{jwt_service::JwtService, password_service::PasswordService},
 };
 
-pub struct AuthUseCases<T, R>
+pub struct AuthUseCases<T, R, B>
 where
     T: UserRepository + Send + Sync,
     R: RoleRepository + Send + Sync,
+    B: BlacklistRepository + Send + Sync,
 {
     user_repository: Arc<T>,
     role_repository: Arc<R>,
+    blacklist_repository: Arc<B>,
     jwt_service: Arc<JwtService>,
 }
 
-impl<T, R> AuthUseCases<T, R>
+impl<T, R, B> AuthUseCases<T, R, B>
 where
     T: UserRepository + Send + Sync,
     R: RoleRepository + Send + Sync,
+    B: BlacklistRepository + Send + Sync,
 {
     pub fn new(
         user_repository: Arc<T>,
         role_repository: Arc<R>,
+        blacklist_repository: Arc<B>,
         jwt_service: Arc<JwtService>,
     ) -> Self {
         Self {
             user_repository,
             role_repository,
+            blacklist_repository,
             jwt_service,
         }
     }
@@ -120,10 +128,42 @@ where
         Ok((user.id, token_pair.access_token, token_pair.refresh_token))
     }
 
+    /// Logout user by blacklisting their tokens
+    pub async fn logout(&self, access_token: String, refresh_token: Option<String>) -> Result<()> {
+        use chrono::DateTime;
+
+        // Blacklist access token
+        if let Ok(claims) = self.jwt_service.validate_access_token(&access_token) {
+            let jti = Uuid::parse_str(&claims.jti)?;
+            let exp = DateTime::from_timestamp(claims.exp, 0)
+                .ok_or_else(|| anyhow::anyhow!("Invalid expiration timestamp"))?;
+            self.blacklist_repository.add(jti, exp).await?;
+        }
+
+        // Blacklist refresh token if provided
+        if let Some(rt) = refresh_token {
+            if let Ok(claims) = self.jwt_service.validate_refresh_token(&rt) {
+                let jti = Uuid::parse_str(&claims.jti)?;
+                let exp = DateTime::from_timestamp(claims.exp, 0)
+                    .ok_or_else(|| anyhow::anyhow!("Invalid expiration timestamp"))?;
+                self.blacklist_repository.add(jti, exp).await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Refresh access token using refresh token
     pub async fn refresh_token(&self, refresh_token: String) -> Result<String> {
         // Validate refresh token
         let claims = self.jwt_service.validate_refresh_token(&refresh_token)?;
+
+        // Check if blacklisted
+        let jti = Uuid::parse_str(&claims.jti)?;
+        if self.blacklist_repository.is_blacklisted(jti).await? {
+            return Err(anyhow::anyhow!("Token is blacklisted"));
+        }
+
         let user_id = Uuid::parse_str(&claims.sub)?;
 
         // Get user to ensure they still exist and are active

@@ -112,4 +112,27 @@ where
     pub async fn delete_user(&self, user_id: Uuid) -> Result<()> {
         self.user_repository.delete(user_id).await
     }
+
+    pub async fn admin_update_user(
+        &self,
+        user_id: Uuid,
+        display_name: Option<String>,
+        avatar_image_url: Option<String>,
+        is_active: Option<bool>,
+        is_verified: Option<bool>,
+    ) -> Result<()> {
+        self.user_repository
+            .admin_update(
+                user_id,
+                display_name,
+                avatar_image_url,
+                is_active,
+                is_verified,
+            )
+            .await
+    }
+
+    pub async fn remove_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()> {
+        self.user_repository.remove_role(user_id, role_id).await
+    }
 }

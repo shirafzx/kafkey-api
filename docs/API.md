@@ -164,6 +164,121 @@ curl -X POST http://localhost:8080/api/v1/auth/refresh \
 
 ---
 
+### User Management
+
+#### GET /users/me
+
+Get current authenticated user's profile.
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": "uuid",
+  "username": "string",
+  "email": "string",
+  "display_name": "string",
+  "avatar_image_url": "string",
+  "is_active": true,
+  "is_verified": false
+}
+```
+
+#### PUT /users/me
+
+Update current authenticated user's profile.
+
+**Request Body:**
+
+```json
+{
+  "display_name": "string (optional)",
+  "avatar_image_url": "string (optional)"
+}
+```
+
+#### GET /users (Admin Only)
+
+List all users in the system.
+
+#### GET /users/:id (Admin Only)
+
+Get details of a specific user.
+
+#### PUT /users/:id (Admin Only)
+
+Update user details (active status, verification).
+
+#### DELETE /users/:id (Admin Only)
+
+Delete a user.
+
+#### POST /users/:id/roles (Admin Only)
+
+Assign a role to a user.
+
+#### DELETE /users/:id/roles/:role_id (Admin Only)
+
+Remove a role from a user.
+
+---
+
+### Role Management (Admin Only)
+
+#### GET /roles
+
+List all roles.
+
+#### POST /roles
+
+Create a new role.
+
+#### GET /roles/:id
+
+Get role details and permissions.
+
+#### PUT /roles/:id
+
+Update role name/description.
+
+#### DELETE /roles/:id
+
+Delete a role.
+
+#### POST /roles/:id/permissions
+
+Assign a permission to a role.
+
+#### DELETE /roles/:id/permissions/:permission_id
+
+Remove a permission from a role.
+
+---
+
+### Permission Management (Admin Only)
+
+#### GET /permissions
+
+List all permissions.
+
+#### POST /permissions
+
+Create a new permission.
+
+#### GET /permissions/:id
+
+Get permission details.
+
+#### PUT /permissions/:id
+
+Update permission name/description.
+
+#### DELETE /permissions/:id
+
+Delete a permission.
+
+---
+
 ### Health Check
 
 #### GET /health-check
@@ -296,27 +411,8 @@ echo "New access token: $NEW_ACCESS"
 
 ## Future Endpoints (Planned)
 
-### User Management
+### Advanced Features
 
-- `GET /api/v1/users/me` - Get current user profile
-- `PUT /api/v1/users/me` - Update current user profile
-- `GET /api/v1/users/:id` - Get user by ID (admin)
-- `POST /api/v1/users/:id/roles` - Assign role to user (admin)
-- `DELETE /api/v1/users/:id/roles/:roleId` - Remove role from user (admin)
-
-### Role Management
-
-- `GET /api/v1/roles` - List all roles
-- `POST /api/v1/roles` - Create new role (admin)
-- `GET /api/v1/roles/:id` - Get role details
-- `PUT /api/v1/roles/:id` - Update role (admin)
-- `DELETE /api/v1/roles/:id` - Delete role (admin)
-- `POST /api/v1/roles/:id/permissions` - Assign permission to role (admin)
-
-### Permission Management
-
-- `GET /api/v1/permissions` - List all permissions
-- `POST /api/v1/permissions` - Create new permission (admin)
-- `GET /api/v1/permissions/:id` - Get permission details
-- `PUT /api/v1/permissions/:id` - Update permission (admin)
-- `DELETE /api/v1/permissions/:id` - Delete permission (admin)
+- OAuth2 integration
+- Two-Factor Authentication
+- API Key management

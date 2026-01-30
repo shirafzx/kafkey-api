@@ -97,4 +97,56 @@ impl RoleRepository for RolePostgres {
 
         Ok(results)
     }
+
+    async fn find_all(&self) -> Result<Vec<RoleEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let results = roles::table
+            .select(RoleEntity::as_select())
+            .load::<RoleEntity>(&mut conn)?;
+
+        Ok(results)
+    }
+
+    async fn update(
+        &self,
+        role_id: Uuid,
+        name_opt: Option<String>,
+        description_opt: Option<String>,
+    ) -> Result<()> {
+        use crate::infrastructure::database::postgres::schema::roles::dsl::*;
+
+        let pool = Arc::clone(&self.db_pool);
+
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+
+            conn.transaction::<_, anyhow::Error, _>(|conn| {
+                if let Some(n) = name_opt {
+                    diesel::update(roles.filter(id.eq(role_id)))
+                        .set(name.eq(n))
+                        .execute(conn)?;
+                }
+
+                if let Some(desc) = description_opt {
+                    diesel::update(roles.filter(id.eq(role_id)))
+                        .set(description.eq(Some(desc)))
+                        .execute(conn)?;
+                }
+
+                Ok(())
+            })?;
+
+            Ok(())
+        })
+        .await??;
+
+        Ok(())
+    }
+
+    async fn delete(&self, role_id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        diesel::delete(roles::table.filter(roles::id.eq(role_id))).execute(&mut conn)?;
+
+        Ok(())
+    }
 }

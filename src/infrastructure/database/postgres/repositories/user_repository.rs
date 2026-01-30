@@ -117,7 +117,6 @@ impl UserRepository for UserPostgres {
 
     async fn get_user_permissions(&self, user_id: Uuid) -> Result<Vec<PermissionEntity>> {
         let mut conn = Arc::clone(&self.db_pool).get()?;
-        // Get all permissions from all roles assigned to the user
         let results = user_roles::table
             .filter(user_roles::user_id.eq(user_id))
             .inner_join(roles::table)
@@ -136,6 +135,18 @@ impl UserRepository for UserPostgres {
         display_name_opt: Option<String>,
         avatar_image_url_opt: Option<String>,
     ) -> Result<()> {
+        self.admin_update(user_id, display_name_opt, avatar_image_url_opt, None, None)
+            .await
+    }
+
+    async fn admin_update(
+        &self,
+        user_id: Uuid,
+        display_name_opt: Option<String>,
+        avatar_image_url_opt: Option<String>,
+        is_active_opt: Option<bool>,
+        is_verified_opt: Option<bool>,
+    ) -> Result<()> {
         use crate::infrastructure::database::postgres::schema::users::dsl::*;
 
         let pool = Arc::clone(&self.db_pool);
@@ -143,19 +154,33 @@ impl UserRepository for UserPostgres {
         tokio::task::spawn_blocking(move || {
             let mut conn = pool.get()?;
 
-            // Update display_name if provided
-            if let Some(name) = display_name_opt {
-                diesel::update(users.filter(id.eq(user_id)))
-                    .set(display_name.eq(name))
-                    .execute(&mut conn)?;
-            }
+            conn.transaction::<_, anyhow::Error, _>(|conn| {
+                if let Some(name) = display_name_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(display_name.eq(name))
+                        .execute(conn)?;
+                }
 
-            // Update avatar_image_url if provided
-            if let Some(avatar) = avatar_image_url_opt {
-                diesel::update(users.filter(id.eq(user_id)))
-                    .set(avatar_image_url.eq(Some(avatar)))
-                    .execute(&mut conn)?;
-            }
+                if let Some(avatar) = avatar_image_url_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(avatar_image_url.eq(Some(avatar)))
+                        .execute(conn)?;
+                }
+
+                if let Some(active) = is_active_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(is_active.eq(Some(active)))
+                        .execute(conn)?;
+                }
+
+                if let Some(verified) = is_verified_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(is_verified.eq(Some(verified)))
+                        .execute(conn)?;
+                }
+
+                Ok(())
+            })?;
 
             Ok(())
         })

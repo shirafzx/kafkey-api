@@ -7,14 +7,22 @@ use axum::{
 };
 use std::sync::Arc;
 
-use crate::services::jwt_service::{JwtService, TokenClaims};
+use crate::{
+    domain::repositories::blacklist_repository::BlacklistRepository,
+    services::jwt_service::{JwtService, TokenClaims},
+};
+use uuid::Uuid;
 
 /// Authentication middleware that validates JWT tokens
-pub async fn auth_middleware(
+pub async fn auth_middleware<B>(
     jwt_service: Arc<JwtService>,
+    blacklist_repository: Arc<B>,
     mut request: Request<Body>,
     next: Next,
-) -> Result<Response, Response> {
+) -> Result<Response, Response>
+where
+    B: BlacklistRepository + Send + Sync,
+{
     // Extract authorization header
     let auth_header = request
         .headers()
@@ -41,6 +49,18 @@ pub async fn auth_middleware(
             return Err((StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response());
         }
     };
+
+    // Check if blacklisted
+    let jti = Uuid::parse_str(&claims.jti)
+        .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token identifier").into_response())?;
+
+    if blacklist_repository
+        .is_blacklisted(jti)
+        .await
+        .unwrap_or(false)
+    {
+        return Err((StatusCode::UNAUTHORIZED, "Token has been revoked").into_response());
+    }
 
     // Add claims to request extensions
     request.extensions_mut().insert(claims);

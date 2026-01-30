@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TokenClaims {
+    pub jti: String, // Unique identifier for the token
     pub sub: String, // Subject (user ID)
     pub exp: i64,    // Expiration time
     pub iat: i64,    // Issued at
@@ -43,6 +44,7 @@ impl JwtService {
         let expiry = now + Duration::minutes(15);
 
         let claims = TokenClaims {
+            jti: Uuid::new_v4().to_string(),
             sub: user_id.to_string(),
             exp: expiry.timestamp(),
             iat: now.timestamp(),
@@ -65,6 +67,7 @@ impl JwtService {
         let expiry = now + Duration::days(7);
 
         let claims = TokenClaims {
+            jti: Uuid::new_v4().to_string(),
             sub: user_id.to_string(),
             exp: expiry.timestamp(),
             iat: now.timestamp(),
