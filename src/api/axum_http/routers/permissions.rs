@@ -9,8 +9,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    api::axum_http::dtos::{CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest},
     api::axum_http::middleware::require_permission,
+    application::dtos::{CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest},
     application::use_cases::permissions::PermissionUseCases,
     infrastructure::database::postgres::repositories::permission_repository::PermissionPostgres,
 };
@@ -36,25 +36,27 @@ pub fn routes(
             })),
         )
         .route(
-            "/api/v1/permissions/:id",
+            "/api/v1/permissions/{id}",
             get(get_permission_by_id).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("permissions.read".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/permissions/:id",
+            "/api/v1/permissions/{id}",
             put(update_permission).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("permissions.update".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/permissions/:id",
+            "/api/v1/permissions/{id}",
             delete(delete_permission).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("permissions.delete".to_string(), req, next)
             })),
         )
         .with_state(permission_use_case)
 }
+
+use crate::api::axum_http::response_utils::{error_response, success_response};
 
 async fn list_permissions(
     State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
@@ -71,9 +73,18 @@ async fn list_permissions(
                     description: p.description,
                 })
                 .collect();
-            (StatusCode::OK, Json(response)).into_response()
+            success_response(
+                "LIST_PERMISSIONS_SUCCESS",
+                "Permissions list retrieved successfully",
+                response,
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "LIST_PERMISSIONS_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -90,8 +101,17 @@ async fn create_permission(
         )
         .await
     {
-        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(id) => success_response(
+            "CREATE_PERMISSION_SUCCESS",
+            "Permission created successfully",
+            serde_json::json!({ "id": id }),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "CREATE_PERMISSION_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -100,18 +120,23 @@ async fn get_permission_by_id(
     State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
 ) -> impl IntoResponse {
     match permission_use_case.get_permission_by_id(id).await {
-        Ok(p) => (
-            StatusCode::OK,
-            Json(PermissionResponse {
+        Ok(p) => success_response(
+            "GET_PERMISSION_SUCCESS",
+            "Permission retrieved successfully",
+            PermissionResponse {
                 id: p.id.to_string(),
                 name: p.name,
                 resource: p.resource,
                 action: p.action,
                 description: p.description,
-            }),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::NOT_FOUND,
+            "PERMISSION_NOT_FOUND",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -124,12 +149,17 @@ async fn update_permission(
         .update_permission(id, request.name, request.description)
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Permission updated" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "UPDATE_PERMISSION_SUCCESS",
+            "Permission updated successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "UPDATE_PERMISSION_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -138,11 +168,16 @@ async fn delete_permission(
     State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
 ) -> impl IntoResponse {
     match permission_use_case.delete_permission(id).await {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Permission deleted" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "DELETE_PERMISSION_SUCCESS",
+            "Permission deleted successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "DELETE_PERMISSION_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }

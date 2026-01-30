@@ -9,10 +9,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    api::axum_http::dtos::{
-        CreateRoleRequest, PermissionResponse, RoleResponse, UpdateRoleRequest,
-    },
     api::axum_http::middleware::require_permission,
+    application::dtos::{CreateRoleRequest, PermissionResponse, RoleResponse, UpdateRoleRequest},
     application::use_cases::roles::RoleUseCases,
     infrastructure::database::postgres::repositories::role_repository::RolePostgres,
 };
@@ -37,43 +35,45 @@ pub fn routes(
             })),
         )
         .route(
-            "/api/v1/roles/:id",
+            "/api/v1/roles/{id}",
             get(get_role_by_id).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("roles.read".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/roles/:id",
+            "/api/v1/roles/{id}",
             put(update_role).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("roles.update".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/roles/:id",
+            "/api/v1/roles/{id}",
             delete(delete_role).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("roles.delete".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/roles/:id/permissions",
+            "/api/v1/roles/{id}/permissions",
             get(get_role_permissions).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("roles.read".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/roles/:id/permissions",
+            "/api/v1/roles/{id}/permissions",
             post(assign_permission).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("roles.update".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/roles/:id/permissions/:permission_id",
+            "/api/v1/roles/{id}/permissions/{permission_id}",
             delete(remove_permission).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("roles.update".to_string(), req, next)
             })),
         )
         .with_state(role_use_case)
 }
+
+use crate::api::axum_http::response_utils::{error_response, success_response};
 
 async fn list_roles(
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
@@ -88,9 +88,18 @@ async fn list_roles(
                     description: r.description,
                 })
                 .collect();
-            (StatusCode::OK, Json(response)).into_response()
+            success_response(
+                "LIST_ROLES_SUCCESS",
+                "Roles list retrieved successfully",
+                response,
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "LIST_ROLES_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -102,8 +111,17 @@ async fn create_role(
         .create_role(request.name, request.description)
         .await
     {
-        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(id) => success_response(
+            "CREATE_ROLE_SUCCESS",
+            "Role created successfully",
+            serde_json::json!({ "id": id }),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "CREATE_ROLE_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -112,16 +130,21 @@ async fn get_role_by_id(
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
 ) -> impl IntoResponse {
     match role_use_case.get_role_by_id(id).await {
-        Ok(r) => (
-            StatusCode::OK,
-            Json(RoleResponse {
+        Ok(r) => success_response(
+            "GET_ROLE_SUCCESS",
+            "Role retrieved successfully",
+            RoleResponse {
                 id: r.id.to_string(),
                 name: r.name,
                 description: r.description,
-            }),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::NOT_FOUND,
+            "ROLE_NOT_FOUND",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -134,12 +157,17 @@ async fn update_role(
         .update_role(id, request.name, request.description)
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Role updated" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "UPDATE_ROLE_SUCCESS",
+            "Role updated successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "UPDATE_ROLE_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -148,12 +176,17 @@ async fn delete_role(
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
 ) -> impl IntoResponse {
     match role_use_case.delete_role(id).await {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Role deleted" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "DELETE_ROLE_SUCCESS",
+            "Role deleted successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "DELETE_ROLE_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -173,13 +206,23 @@ async fn get_role_permissions(
                     description: p.description,
                 })
                 .collect();
-            (StatusCode::OK, Json(response)).into_response()
+            success_response(
+                "GET_ROLE_PERMISSIONS_SUCCESS",
+                "Role permissions retrieved successfully",
+                response,
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "GET_ROLE_PERMISSIONS_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AssignPermissionRequest {
     permission_id: Uuid,
 }
@@ -193,12 +236,17 @@ async fn assign_permission(
         .assign_permission(id, request.permission_id)
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Permission assigned" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "ASSIGN_PERMISSION_SUCCESS",
+            "Permission assigned to role successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "ASSIGN_PERMISSION_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -210,11 +258,16 @@ async fn remove_permission(
         .remove_permission(role_id, permission_id)
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Permission removed" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "REMOVE_PERMISSION_SUCCESS",
+            "Permission removed from role successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "REMOVE_PERMISSION_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }

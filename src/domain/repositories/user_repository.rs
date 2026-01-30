@@ -42,5 +42,7 @@ pub trait UserRepository {
     ) -> Result<()>;
 
     async fn find_all(&self) -> Result<Vec<UserEntity>>;
+    async fn find_paginated(&self, limit: i64, offset: i64) -> Result<Vec<UserEntity>>;
+    async fn count(&self) -> Result<i64>;
     async fn delete(&self, id: Uuid) -> Result<()>;
 }

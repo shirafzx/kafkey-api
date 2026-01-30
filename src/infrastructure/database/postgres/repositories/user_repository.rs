@@ -228,6 +228,24 @@ impl UserRepository for UserPostgres {
         Ok(results)
     }
 
+    async fn find_paginated(&self, limit: i64, offset: i64) -> Result<Vec<UserEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let results = users::table
+            .select(UserEntity::as_select())
+            .limit(limit)
+            .offset(offset)
+            .load::<UserEntity>(&mut conn)?;
+
+        Ok(results)
+    }
+
+    async fn count(&self) -> Result<i64> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let total = users::table.count().get_result::<i64>(&mut conn)?;
+
+        Ok(total)
+    }
+
     async fn delete(&self, id: Uuid) -> Result<()> {
         let mut conn = Arc::clone(&self.db_pool).get()?;
         diesel::delete(users::table.filter(users::id.eq(id))).execute(&mut conn)?;

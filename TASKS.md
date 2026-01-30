@@ -34,75 +34,44 @@
 
 ### Phase 5: Authentication & Authorization
 
-- [x] Add JWT dependencies (jsonwebtoken, argon2)
-- [x] Create JWT token service (generate, validate)
-- [x] Create password hashing service (using argon2)
+- [x] Create authentication service (generate/validate JWT)
+- [x] Create authentication middleware to extract JWT
+- [x] Create authorization middleware (PBAC check)
+- [x] Add granular `RequirePermission` guards
 
-### Phase 6: API Layer
+### Phase 6: API Layer - Managed Routes
 
-- [x] Create authentication routes (login, refresh token)
-- [x] Update registration to assign default role
-- [x] Add `/api/v1` prefix to all routes
-- [x] Create user profile routes (`GET/PUT /api/v1/users/me`)
-- [x] Create administrative user list route (`GET /api/v1/users`) (requires `users.read`)
-- [x] Transition all routes from RBAC to granular PBAC
-- [x] Implement administrative user roles/permissions retrieval routes
-
-### Phase 7: Documentation
-
-- [x] Create README.md with installation instructions
-- [x] Create API documentation
-- [x] Create implementation plan documentation
-- [x] Create walkthrough documentation
-
----
-
-## 🚧 In Progress / TODO
-
-### Authentication & Authorization
-
-- [x] Create authentication middleware to extract JWT from requests
-- [x] Create authorization middleware (check roles/permissions)
-- [x] Add `RequireRole` guard for role-based access
-- [x] Add `RequirePermission` guard for permission-based access
-
-### API Layer - Additional Routes
-
-### User Management
-
+- [x] `POST /api/v1/auth/sign-up` - Register with default role
+- [x] `POST /api/v1/auth/login` - Login with credentials
+- [x] `POST /api/v1/auth/refresh` - Refresh access token
 - [x] `GET /api/v1/users/me` - Get current user profile
 - [x] `PUT /api/v1/users/me` - Update current user profile
+- [x] `GET /api/v1/users` - List all users (Paginated, requires `users.read`)
 - [x] `GET /api/v1/users/:id` - Get user by ID (requires `users.read`)
 - [x] `PUT /api/v1/users/:id` - Update user (requires `users.update`)
 - [x] `DELETE /api/v1/users/:id` - Delete user (requires `users.delete`)
 - [x] `POST /api/v1/users/:id/roles` - Assign role to user (requires `users.update`)
 - [x] `DELETE /api/v1/users/:id/roles/:roleId` - Remove role from user (requires `users.update`)
-- [x] `GET /api/v1/users/:id/roles` - Get user's roles
-- [x] `GET /api/v1/users/:id/permissions` - Get user's permissions
+- [x] `GET /roles` - CRUD for roles (requires `roles.*`)
+- [x] `GET /permissions` - CRUD for permissions (requires `permissions.*`)
 
-#### Role Management
+### Phase 7: API Standardization & Refactoring
 
-- [x] `GET /api/v1/roles` - List all roles (requires `roles.read`)
-- [x] `POST /api/v1/roles` - Create new role (requires `roles.create`)
-- [x] `GET /api/v1/roles/:id` - Get role details (requires `roles.read`)
-- [x] `PUT /api/v1/roles/:id` - Update role (requires `roles.update`)
-- [x] `DELETE /api/v1/roles/:id` - Delete role (requires `roles.delete`)
-- [x] `GET /api/v1/roles/:id/permissions` - Get role's permissions (requires `roles.read`)
-- [x] `POST /api/v1/roles/:id/permissions` - Assign permission to role (requires `roles.update`)
-- [x] `DELETE /api/v1/roles/:id/permissions/:permissionId` - Remove permission from role (requires `roles.update`)
+- [x] Standardize API response envelope (`ApiResponse`, `ApiErrorResponse`)
+- [x] Enforce `camelCase` for all JSON keys globally
+- [x] Implement `x-request-id` tracking middleware
+- [x] Refactor DTOs into domain-specific modules in the application layer
+- [x] Refactor pagination to use nested structure with `hasNext`/`hasPrev` flags
 
-#### Permission Management
+### Phase 8: Documentation
 
-- [x] `GET /api/v1/permissions` - List all permissions (requires `permissions.read`)
-- [x] `POST /api/v1/permissions` - Create new permission (requires `permissions.create`)
-- [x] `GET /api/v1/permissions/:id` - Get permission details (requires `permissions.read`)
-- [x] `PUT /api/v1/permissions/:id` - Update permission (requires `permissions.update`)
-- [x] `DELETE /api/v1/permissions/:id` - Delete permission (requires `permissions.delete`)
+- [x] Create README.md with installation instructions
+- [x] Create initial API documentation
+- [x] Create technical walkthrough
 
-### Testing
+---
 
-- [x] Test role-based access control in routes
-- [x] Test permission-based access control in routes
+## 🚧 In Progress / TODO
 
 ### Security Enhancements
 
@@ -120,7 +89,7 @@
 - [ ] Add database query optimization and indexes
 - [ ] Implement caching for frequently accessed data (roles, permissions)
 - [ ] Add database connection pool tuning
-- [ ] Implement pagination for list endpoints
+- [x] Implement pagination for list endpoints (Users)
 - [ ] Add query result limits
 
 ### Monitoring & Logging
@@ -128,7 +97,7 @@
 - [ ] Add structured logging for authentication events
 - [ ] Implement audit logging for admin actions
 - [ ] Add metrics collection (Prometheus/OpenTelemetry)
-- [ ] Set up health check endpoints with database connectivity
+- [x] Set up health check endpoints with database connectivity
 - [ ] Add error tracking integration (Sentry, etc.)
 
 ### DevOps & Deployment
@@ -137,50 +106,21 @@
 - [ ] Create docker-compose.yml for local development
 - [ ] Set up CI/CD pipeline (GitHub Actions/GitLab CI)
 - [ ] Add environment-specific configuration
-- [ ] Create deployment documentation
-- [ ] Set up database backup strategy
-- [ ] Configure HTTPS/TLS in production
-
-### Code Quality
-
-- [ ] Add clippy lints configuration
-- [ ] Set up rustfmt configuration
-- [ ] Add pre-commit hooks
-- [ ] Improve error handling and custom error types
-- [ ] Add input validation for all endpoints
-- [ ] Remove unused imports and dead code
-- [ ] Add comprehensive documentation comments
 
 ---
 
 ## 🎯 Future Enhancements
 
-### Advanced Features
-
 - [ ] OAuth2 integration (Google, GitHub, etc.)
-- [ ] SAML support for enterprise SSO
 - [ ] Multi-tenancy support
-- [ ] API key authentication for service-to-service calls
 - [ ] WebSocket support for real-time notifications
-- [ ] GraphQL API endpoint
 - [ ] Admin dashboard UI
-- [ ] User profile image upload
-- [ ] Session management and device tracking
-
-### Database
-
-- [ ] Add soft delete for users
-- [ ] Implement database migrations rollback testing
-- [ ] Add database seeding for development/testing
-- [ ] Consider read replicas for scaling
 
 ---
 
 ## 📝 Notes
 
-- Default roles created: `admin`, `user`
-- Default permissions include CRUD operations for users, roles, and permissions
-- Access tokens expire after 15 minutes
-- Refresh tokens expire after 7 days
-- Password hashing uses Argon2 algorithm
-- All API endpoints use `/api/v1` prefix for versioning
+- Default roles: `admin`, `user`
+- Password hashing: Argon2
+- Response Format: Standard envelope with `camelCase` keys
+- Global header: `x-request-id` included in all responses

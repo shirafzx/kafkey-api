@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
 
 use crate::{
-    api::axum_http::dtos::{AuthResponse, LoginRequest, RefreshTokenRequest, RegisterRequest},
+    application::dtos::{AuthResponse, LoginRequest, RefreshTokenRequest, RegisterRequest},
     application::use_cases::{auth_use_cases::AuthUseCases, users::UserUseCases},
     infrastructure::database::postgres::{
         postgres_connection::PgPoolSquad,
@@ -14,6 +14,8 @@ use crate::{
     },
     services::jwt_service::JwtService,
 };
+
+use crate::api::axum_http::response_utils::{error_response, success_response};
 
 pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router {
     let user_repository = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
@@ -55,15 +57,17 @@ async fn register(
         )
         .await
     {
-        Ok(user_id) => (
-            StatusCode::CREATED,
-            Json(serde_json::json!({
-                "message": "User registered successfully",
-                "user_id": user_id.to_string()
-            })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(user_id) => success_response(
+            "REGISTER_SUCCESS",
+            "User registered successfully",
+            serde_json::json!({ "userId": user_id.to_string() }),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "REGISTER_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -79,16 +83,21 @@ async fn login(
         .login(request.email_or_username, request.password)
         .await
     {
-        Ok((user_id, access_token, refresh_token)) => (
-            StatusCode::OK,
-            Json(AuthResponse {
+        Ok((user_id, access_token, refresh_token)) => success_response(
+            "AUTH_SUCCESS",
+            "Login successful",
+            AuthResponse {
                 user_id: user_id.to_string(),
                 access_token,
                 refresh_token,
-            }),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::UNAUTHORIZED, e.to_string()).into_response(),
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::UNAUTHORIZED,
+            "AUTH_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -101,14 +110,17 @@ async fn refresh_token(
     Json(request): Json<RefreshTokenRequest>,
 ) -> impl IntoResponse {
     match auth_use_case.refresh_token(request.refresh_token).await {
-        Ok(access_token) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "access_token": access_token
-            })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::UNAUTHORIZED, e.to_string()).into_response(),
+        Ok(access_token) => success_response(
+            "TOKEN_REFRESHED",
+            "Access token refreshed successfully",
+            serde_json::json!({ "accessToken": access_token }),
+        ),
+        Err(e) => error_response(
+            StatusCode::UNAUTHORIZED,
+            "REFRESH_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -130,11 +142,12 @@ async fn logout(
     let access_token = match access_token {
         Some(token) => token,
         None => {
-            return (
+            return error_response(
                 StatusCode::BAD_REQUEST,
+                "MISSING_AUTH",
                 "Missing or invalid authorization header",
-            )
-                .into_response();
+                None,
+            );
         }
     };
 
@@ -142,13 +155,16 @@ async fn logout(
         .logout(access_token, Some(request.refresh_token))
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "message": "Logged out successfully"
-            })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "LOGOUT_SUCCESS",
+            "Logged out successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "LOGOUT_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }

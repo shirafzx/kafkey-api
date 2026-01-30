@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
@@ -10,18 +10,18 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    api::axum_http::dtos::UpdateProfileRequest,
+    api::axum_http::middleware::require_permission,
+    api::axum_http::response_utils::{error_response, success_response},
+    application::dtos::{
+        AdminUpdateUserRequest, PaginatedResponse, PaginationParams, PermissionResponse,
+        RoleResponse, UpdateProfileRequest, UserResponse,
+    },
     application::use_cases::users::UserUseCases,
     infrastructure::database::postgres::{
         postgres_connection::PgPoolSquad, repositories::user_repository::UserPostgres,
     },
     services::jwt_service::TokenClaims,
 };
-
-use crate::api::axum_http::dtos::{
-    AdminUpdateUserRequest, PermissionResponse, RoleResponse, UserResponse,
-};
-use crate::api::axum_http::middleware::require_permission;
 
 pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
     let user_repository = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
@@ -37,43 +37,43 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
             })),
         )
         .route(
-            "/api/v1/users/:id",
+            "/api/v1/users/{id}",
             get(get_user_by_id).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.read".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/users/:id",
+            "/api/v1/users/{id}",
             put(admin_update_user).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.update".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/users/:id",
+            "/api/v1/users/{id}",
             delete(delete_user).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.delete".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/users/:id/roles",
+            "/api/v1/users/{id}/roles",
             get(get_user_roles).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.read".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/users/:id/roles",
+            "/api/v1/users/{id}/roles",
             post(assign_role).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.update".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/users/:id/roles/:role_id",
+            "/api/v1/users/{id}/roles/{role_id}",
             delete(remove_role).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.update".to_string(), req, next)
             })),
         )
         .route(
-            "/api/v1/users/:id/permissions",
+            "/api/v1/users/{id}/permissions",
             get(get_user_permissions).layer(axum::middleware::from_fn(|req, next| {
                 require_permission("users.read".to_string(), req, next)
             })),
@@ -85,15 +85,38 @@ async fn get_current_user(
     Extension(claims): Extension<TokenClaims>,
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
 ) -> impl IntoResponse {
-    match user_use_case.get_current_user_profile(&claims.sub).await {
-        Ok(profile) => (StatusCode::OK, Json(profile)).into_response(),
-        Err(e) if e.to_string().contains("Invalid user ID") => {
-            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_USER_ID",
+                "Invalid user ID in token",
+                None,
+            );
         }
-        Err(e) if e.to_string().contains("not found") => {
-            (StatusCode::NOT_FOUND, e.to_string()).into_response()
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    match user_use_case.get_user_by_id(user_id).await {
+        Ok(u) => success_response(
+            "GET_PROFILE_SUCCESS",
+            "User profile retrieved successfully",
+            UserResponse {
+                id: u.id.to_string(),
+                username: u.username,
+                email: u.email,
+                display_name: u.display_name,
+                avatar_image_url: u.avatar_image_url,
+                is_active: u.is_active.unwrap_or(true),
+                is_verified: u.is_verified.unwrap_or(false),
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::NOT_FOUND,
+            "PROFILE_NOT_FOUND",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -102,29 +125,45 @@ async fn update_current_user(
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
     Json(request): Json<UpdateProfileRequest>,
 ) -> impl IntoResponse {
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_USER_ID",
+                "Invalid user ID in token",
+                None,
+            );
+        }
+    };
+
     match user_use_case
-        .update_current_user_profile(&claims.sub, request.display_name, request.avatar_image_url)
+        .update_user_profile(user_id, request.display_name, request.avatar_image_url)
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "message": "Profile updated successfully"
-            })),
-        )
-            .into_response(),
-        Err(e) if e.to_string().contains("Invalid user ID") => {
-            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "UPDATE_PROFILE_SUCCESS",
+            "User profile updated successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "UPDATE_PROFILE_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 async fn list_users(
+    Query(params): Query<PaginationParams>,
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
 ) -> impl IntoResponse {
-    match user_use_case.list_users().await {
-        Ok(users) => {
-            let response: Vec<UserResponse> = users
+    let page = params.page.unwrap_or(1);
+    let page_size = params.page_size.unwrap_or(20);
+
+    match user_use_case.list_users_paginated(page, page_size).await {
+        Ok((users, total)) => {
+            let user_responses: Vec<UserResponse> = users
                 .into_iter()
                 .map(|u| UserResponse {
                     id: u.id.to_string(),
@@ -136,9 +175,33 @@ async fn list_users(
                     is_verified: u.is_verified.unwrap_or(false),
                 })
                 .collect();
-            (StatusCode::OK, Json(response)).into_response()
+
+            let total_pages = (total as f64 / page_size as f64).ceil() as i64;
+            let has_next = page < total_pages;
+            let has_prev = page > 1;
+
+            let response = PaginatedResponse {
+                items: user_responses,
+                page,
+                page_size,
+                total_items: total,
+                total_pages,
+                has_next,
+                has_prev,
+            };
+
+            success_response(
+                "LIST_USERS_SUCCESS",
+                "Users list retrieved successfully",
+                response,
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "LIST_USERS_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -147,20 +210,25 @@ async fn get_user_by_id(
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_by_id(id).await {
-        Ok(user) => (
-            StatusCode::OK,
-            Json(UserResponse {
-                id: user.id.to_string(),
-                username: user.username,
-                email: user.email,
-                display_name: user.display_name,
-                avatar_image_url: user.avatar_image_url,
-                is_active: user.is_active.unwrap_or(true),
-                is_verified: user.is_verified.unwrap_or(false),
-            }),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+        Ok(u) => success_response(
+            "GET_USER_SUCCESS",
+            "User retrieved successfully",
+            UserResponse {
+                id: u.id.to_string(),
+                username: u.username,
+                email: u.email,
+                display_name: u.display_name,
+                avatar_image_url: u.avatar_image_url,
+                is_active: u.is_active.unwrap_or(true),
+                is_verified: u.is_verified.unwrap_or(false),
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::NOT_FOUND,
+            "USER_NOT_FOUND",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -179,12 +247,17 @@ async fn admin_update_user(
         )
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "User updated successfully" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "ADMIN_UPDATE_USER_SUCCESS",
+            "User updated by administrator successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "ADMIN_UPDATE_USER_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -193,18 +266,24 @@ async fn delete_user(
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
 ) -> impl IntoResponse {
     match user_use_case.delete_user(id).await {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "User deleted successfully" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "DELETE_USER_SUCCESS",
+            "User deleted successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "DELETE_USER_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct AssignRoleRequest {
-    pub role_id: Uuid,
+#[serde(rename_all = "camelCase")]
+struct AssignRoleRequest {
+    role_id: Uuid,
 }
 
 async fn assign_role(
@@ -216,12 +295,17 @@ async fn assign_role(
         .assign_default_role(user_id, request.role_id)
         .await
     {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Role assigned successfully" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "ASSIGN_ROLE_SUCCESS",
+            "Role assigned successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "ASSIGN_ROLE_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -230,12 +314,17 @@ async fn remove_role(
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
 ) -> impl IntoResponse {
     match user_use_case.remove_role(user_id, role_id).await {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({ "message": "Role removed successfully" })),
-        )
-            .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(_) => success_response(
+            "REMOVE_ROLE_SUCCESS",
+            "Role removed successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "REMOVE_ROLE_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -253,9 +342,18 @@ async fn get_user_roles(
                     description: r.description,
                 })
                 .collect();
-            (StatusCode::OK, Json(response)).into_response()
+            success_response(
+                "GET_USER_ROLES_SUCCESS",
+                "User roles retrieved successfully",
+                response,
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "GET_USER_ROLES_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }
 
@@ -275,8 +373,17 @@ async fn get_user_permissions(
                     description: p.description,
                 })
                 .collect();
-            (StatusCode::OK, Json(response)).into_response()
+            success_response(
+                "GET_USER_PERMISSIONS_SUCCESS",
+                "User permissions retrieved successfully",
+                response,
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "GET_USER_PERMISSIONS_FAILED",
+            &e.to_string(),
+            None,
+        ),
     }
 }

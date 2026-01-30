@@ -64,7 +64,7 @@ where
     pub async fn get_current_user_profile(
         &self,
         user_id_str: &str,
-    ) -> Result<crate::api::axum_http::dtos::UserProfileResponse> {
+    ) -> Result<crate::application::dtos::UserProfileResponse> {
         // Parse user ID
         let user_id =
             Uuid::parse_str(user_id_str).map_err(|_| anyhow::anyhow!("Invalid user ID format"))?;
@@ -82,7 +82,7 @@ where
             .collect();
 
         // Build response
-        Ok(crate::api::axum_http::dtos::UserProfileResponse {
+        Ok(crate::application::dtos::UserProfileResponse {
             id: user.id.to_string(),
             username: user.username,
             email: user.email,
@@ -112,12 +112,26 @@ where
             .await
     }
 
-    pub async fn list_users(&self) -> Result<Vec<crate::domain::entities::user::UserEntity>> {
+    pub async fn find_all(&self) -> Result<Vec<crate::domain::entities::user::UserEntity>> {
         self.user_repository.find_all().await
     }
 
-    pub async fn delete_user(&self, user_id: Uuid) -> Result<()> {
-        self.user_repository.delete(user_id).await
+    pub async fn list_users_paginated(
+        &self,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<crate::domain::entities::user::UserEntity>, i64)> {
+        let offset = (page - 1) * page_size;
+        let items = self
+            .user_repository
+            .find_paginated(page_size, offset)
+            .await?;
+        let total = self.user_repository.count().await?;
+        Ok((items, total))
+    }
+
+    pub async fn delete_user(&self, id: Uuid) -> Result<()> {
+        self.user_repository.delete(id).await
     }
 
     pub async fn admin_update_user(

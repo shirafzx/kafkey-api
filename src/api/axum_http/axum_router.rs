@@ -83,6 +83,9 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
                 .await
             }
         }))
+        .layer(axum::middleware::from_fn(
+            middleware::request_id::request_id_middleware,
+        ))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(config.server.timeout),

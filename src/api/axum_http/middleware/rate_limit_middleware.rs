@@ -1,9 +1,10 @@
+use crate::api::axum_http::response_utils::error_response;
 use axum::{
     body::Body,
     extract::{ConnectInfo, Request},
-    http::{StatusCode, header},
+    http::StatusCode,
     middleware::Next,
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use std::{
     collections::HashMap,
@@ -60,15 +61,12 @@ pub async fn rate_limit_middleware(
         }
 
         if *count > config.requests_per_window {
-            return (
+            return error_response(
                 StatusCode::TOO_MANY_REQUESTS,
-                [(
-                    header::RETRY_AFTER,
-                    config.window_duration.as_secs().to_string(),
-                )],
+                "RATE_LIMIT_EXCEEDED",
                 "Too many requests, please try again later",
-            )
-                .into_response();
+                None,
+            );
         }
     }
 
