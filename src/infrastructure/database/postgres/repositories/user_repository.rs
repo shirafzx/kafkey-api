@@ -81,6 +81,36 @@ impl UserRepository for UserPostgres {
         Ok(())
     }
 
+    async fn increment_failed_login(&self, id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(id)))
+            .set(users::failed_login_attempts.eq(users::failed_login_attempts + 1))
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn reset_failed_login(&self, id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(id)))
+            .set((
+                users::failed_login_attempts.eq(0),
+                users::locked_at.eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
+            ))
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn lock_account(&self, id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(id)))
+            .set(users::locked_at.eq(diesel::dsl::now))
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
     async fn assign_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()> {
         let mut conn = Arc::clone(&self.db_pool).get()?;
         let new_assignment = NewUserRoleEntity { user_id, role_id };

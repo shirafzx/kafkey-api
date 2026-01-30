@@ -68,6 +68,8 @@ diesel::table! {
         is_active -> Nullable<Bool>,
         is_verified -> Nullable<Bool>,
         last_login_at -> Nullable<Timestamptz>,
+        failed_login_attempts -> Int4,
+        locked_at -> Nullable<Timestamptz>,
     }
 }
 

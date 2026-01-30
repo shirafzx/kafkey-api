@@ -19,6 +19,8 @@ pub struct UserEntity {
     pub is_active: Option<bool>,
     pub is_verified: Option<bool>,
     pub last_login_at: Option<DateTime<Utc>>,
+    pub failed_login_attempts: i32,
+    pub locked_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Insertable)]

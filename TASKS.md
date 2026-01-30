@@ -45,6 +45,8 @@
 - [x] Add `/api/v1` prefix to all routes
 - [x] Create user profile routes (`GET/PUT /api/v1/users/me`)
 - [x] Create administrative user list route (`GET /api/v1/users`) (requires `users.read`)
+- [x] Transition all routes from RBAC to granular PBAC
+- [x] Implement administrative user roles/permissions retrieval routes
 
 ### Phase 7: Documentation
 
@@ -106,7 +108,7 @@
 
 - [x] Add global rate limiting for all endpoints
 - [x] Implement token blacklist for logout functionality
-- [ ] Add account lockout after failed login attempts
+- [x] Add account lockout after failed login attempts
 - [ ] Implement email verification flow
 - [ ] Add password reset functionality
 - [ ] Add two-factor authentication (2FA) support

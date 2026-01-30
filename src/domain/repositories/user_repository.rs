@@ -15,6 +15,9 @@ pub trait UserRepository {
     async fn find_by_username(&self, username: String) -> Result<UserEntity>;
     async fn find_by_email(&self, email: String) -> Result<UserEntity>;
     async fn update_last_login(&self, id: Uuid) -> Result<()>;
+    async fn increment_failed_login(&self, id: Uuid) -> Result<()>;
+    async fn reset_failed_login(&self, id: Uuid) -> Result<()>;
+    async fn lock_account(&self, id: Uuid) -> Result<()>;
 
     // Role management
     async fn assign_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()>;

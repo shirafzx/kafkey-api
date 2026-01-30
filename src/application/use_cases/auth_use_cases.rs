@@ -85,6 +85,9 @@ where
         email_or_username: String,
         password: String,
     ) -> Result<(Uuid, String, String)> {
+        const MAX_FAILED_ATTEMPTS: i32 = 5;
+        const LOCKOUT_DURATION_MINUTES: i64 = 30;
+
         // Try to find user by email or username
         let user = match self
             .user_repository
@@ -99,9 +102,37 @@ where
             }
         };
 
+        // Check if account is locked
+        if let Some(locked_at) = user.locked_at {
+            let now = chrono::Utc::now();
+            let lockout_duration = chrono::Duration::minutes(LOCKOUT_DURATION_MINUTES);
+            if now < locked_at + lockout_duration {
+                let remaining = (locked_at + lockout_duration) - now;
+                return Err(anyhow::anyhow!(
+                    "Account is locked. Please try again in {} minutes.",
+                    remaining.num_minutes() + 1
+                ));
+            } else {
+                // Lockout expired, reset for this attempt
+                self.user_repository.reset_failed_login(user.id).await?;
+            }
+        }
+
         // Verify password
         let is_valid = PasswordService::verify_password(&password, &user.password_hash)?;
         if !is_valid {
+            // Increment failed attempts
+            self.user_repository.increment_failed_login(user.id).await?;
+
+            // Check if we should lock now
+            if user.failed_login_attempts + 1 >= MAX_FAILED_ATTEMPTS {
+                self.user_repository.lock_account(user.id).await?;
+                return Err(anyhow::anyhow!(
+                    "Too many failed attempts. Account locked for {} minutes.",
+                    LOCKOUT_DURATION_MINUTES
+                ));
+            }
+
             return Err(anyhow::anyhow!("Invalid credentials"));
         }
 
@@ -110,7 +141,8 @@ where
             return Err(anyhow::anyhow!("User account is deactivated"));
         }
 
-        // Update last login
+        // Successful login: Reset failed attempts and update last login
+        self.user_repository.reset_failed_login(user.id).await?;
         self.user_repository.update_last_login(user.id).await?;
 
         // Get user roles and permissions
