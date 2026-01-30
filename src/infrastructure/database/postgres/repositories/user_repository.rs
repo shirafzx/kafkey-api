@@ -163,4 +163,20 @@ impl UserRepository for UserPostgres {
 
         Ok(())
     }
+
+    async fn find_all(&self) -> Result<Vec<UserEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let results = users::table
+            .select(UserEntity::as_select())
+            .load::<UserEntity>(&mut conn)?;
+
+        Ok(results)
+    }
+
+    async fn delete(&self, id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        diesel::delete(users::table.filter(users::id.eq(id))).execute(&mut conn)?;
+
+        Ok(())
+    }
 }

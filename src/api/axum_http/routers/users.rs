@@ -17,6 +17,9 @@ use crate::{
     services::jwt_service::TokenClaims,
 };
 
+use crate::api::axum_http::dtos::UserResponse;
+use crate::api::axum_http::middleware::require_role;
+
 pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
     let user_repository = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
     let user_use_case = Arc::new(UserUseCases::new(user_repository));
@@ -24,6 +27,12 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
     Router::new()
         .route("/api/v1/users/me", get(get_current_user))
         .route("/api/v1/users/me", put(update_current_user))
+        .route(
+            "/api/v1/users",
+            get(list_users).layer(axum::middleware::from_fn(|req, next| {
+                require_role("admin".to_string(), req, next)
+            })),
+        )
         .with_state(user_use_case)
 }
 
@@ -61,6 +70,28 @@ async fn update_current_user(
             .into_response(),
         Err(e) if e.to_string().contains("Invalid user ID") => {
             (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+async fn list_users(
+    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+) -> impl IntoResponse {
+    match user_use_case.list_users().await {
+        Ok(users) => {
+            let response: Vec<UserResponse> = users
+                .into_iter()
+                .map(|u| UserResponse {
+                    id: u.id.to_string(),
+                    username: u.username,
+                    email: u.email,
+                    display_name: u.display_name,
+                    avatar_image_url: u.avatar_image_url,
+                    is_active: u.is_active.unwrap_or(true),
+                    is_verified: u.is_verified.unwrap_or(false),
+                })
+                .collect();
+            (StatusCode::OK, Json(response)).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }

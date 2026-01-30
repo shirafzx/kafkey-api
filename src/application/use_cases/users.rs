@@ -104,4 +104,12 @@ where
             .update_profile(user_id, display_name, avatar_image_url)
             .await
     }
+
+    pub async fn list_users(&self) -> Result<Vec<crate::domain::entities::user::UserEntity>> {
+        self.user_repository.find_all().await
+    }
+
+    pub async fn delete_user(&self, user_id: Uuid) -> Result<()> {
+        self.user_repository.delete(user_id).await
+    }
 }

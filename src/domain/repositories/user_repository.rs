@@ -28,4 +28,7 @@ pub trait UserRepository {
         display_name: Option<String>,
         avatar_image_url: Option<String>,
     ) -> Result<()>;
+
+    async fn find_all(&self) -> Result<Vec<UserEntity>>;
+    async fn delete(&self, id: Uuid) -> Result<()>;
 }
