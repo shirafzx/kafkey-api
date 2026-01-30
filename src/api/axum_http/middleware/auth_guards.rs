@@ -1,11 +1,5 @@
-use crate::services::jwt_service::TokenClaims;
-use axum::{
-    body::Body,
-    extract::Request,
-    http::StatusCode,
-    middleware::Next,
-    response::{IntoResponse, Response},
-};
+use crate::{api::axum_http::response_utils::error_response, services::jwt_service::TokenClaims};
+use axum::{body::Body, extract::Request, http::StatusCode, middleware::Next, response::Response};
 
 /// Middleware to require a specific role
 pub async fn require_role(
@@ -13,19 +7,24 @@ pub async fn require_role(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, Response> {
-    let claims = request
-        .extensions()
-        .get::<TokenClaims>()
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Authentication required").into_response())?;
+    let claims = request.extensions().get::<TokenClaims>().ok_or_else(|| {
+        error_response(
+            StatusCode::UNAUTHORIZED,
+            "AUTH_REQUIRED",
+            "Authentication required",
+            None,
+        )
+    })?;
 
     if claims.roles.iter().any(|r| r == &required_role) {
         Ok(next.run(request).await)
     } else {
-        Err((
+        Err(error_response(
             StatusCode::FORBIDDEN,
-            format!("Missing required role: {}", required_role),
-        )
-            .into_response())
+            "MISSING_ROLE",
+            &format!("Missing required role: {}", required_role),
+            None,
+        ))
     }
 }
 
@@ -35,18 +34,23 @@ pub async fn require_permission(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, Response> {
-    let claims = request
-        .extensions()
-        .get::<TokenClaims>()
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Authentication required").into_response())?;
+    let claims = request.extensions().get::<TokenClaims>().ok_or_else(|| {
+        error_response(
+            StatusCode::UNAUTHORIZED,
+            "AUTH_REQUIRED",
+            "Authentication required",
+            None,
+        )
+    })?;
 
     if claims.permissions.iter().any(|p| p == &required_permission) {
         Ok(next.run(request).await)
     } else {
-        Err((
+        Err(error_response(
             StatusCode::FORBIDDEN,
-            format!("Missing required permission: {}", required_permission),
-        )
-            .into_response())
+            "MISSING_PERMISSION",
+            &format!("Missing required permission: {}", required_permission),
+            None,
+        ))
     }
 }

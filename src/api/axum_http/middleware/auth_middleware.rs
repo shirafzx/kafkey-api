@@ -3,11 +3,12 @@ use axum::{
     extract::Request,
     http::{StatusCode, header},
     middleware::Next,
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use std::sync::Arc;
 
 use crate::{
+    api::axum_http::response_utils::error_response,
     domain::repositories::blacklist_repository::BlacklistRepository,
     services::jwt_service::{JwtService, TokenClaims},
 };
@@ -34,11 +35,12 @@ where
             header.trim_start_matches("Bearer ").to_string()
         }
         _ => {
-            return Err((
+            return Err(error_response(
                 StatusCode::UNAUTHORIZED,
+                "MISSING_AUTH_HEADER",
                 "Missing or invalid Authorization header",
-            )
-                .into_response());
+                None,
+            ));
         }
     };
 
@@ -46,20 +48,36 @@ where
     let claims = match jwt_service.validate_access_token(&token) {
         Ok(claims) => claims,
         Err(_) => {
-            return Err((StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response());
+            return Err(error_response(
+                StatusCode::UNAUTHORIZED,
+                "INVALID_TOKEN",
+                "Invalid or expired token",
+                None,
+            ));
         }
     };
 
     // Check if blacklisted
-    let jti = Uuid::parse_str(&claims.jti)
-        .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token identifier").into_response())?;
+    let jti = Uuid::parse_str(&claims.jti).map_err(|_| {
+        error_response(
+            StatusCode::UNAUTHORIZED,
+            "INVALID_TOKEN_ID",
+            "Invalid token identifier",
+            None,
+        )
+    })?;
 
     if blacklist_repository
         .is_blacklisted(jti)
         .await
         .unwrap_or(false)
     {
-        return Err((StatusCode::UNAUTHORIZED, "Token has been revoked").into_response());
+        return Err(error_response(
+            StatusCode::UNAUTHORIZED,
+            "TOKEN_REVOKED",
+            "Token has been revoked",
+            None,
+        ));
     }
 
     // Add claims to request extensions

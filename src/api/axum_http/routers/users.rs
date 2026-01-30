@@ -10,7 +10,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    api::axum_http::middleware::require_permission,
+    api::axum_http::middleware::{require_permission, require_role},
     api::axum_http::response_utils::{error_response, success_response},
     application::dtos::{
         AdminUpdateUserRequest, PaginatedResponse, PaginationParams, PermissionResponse,
@@ -32,9 +32,13 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
         .route("/api/v1/users/me", put(update_current_user))
         .route(
             "/api/v1/users",
-            get(list_users).layer(axum::middleware::from_fn(|req, next| {
-                require_permission("users.read".to_string(), req, next)
-            })),
+            get(list_users)
+                .layer(axum::middleware::from_fn(|req, next| {
+                    require_permission("users.read".to_string(), req, next)
+                }))
+                .layer(axum::middleware::from_fn(|req, next| {
+                    require_role("admin".to_string(), req, next)
+                })),
         )
         .route(
             "/api/v1/users/{id}",
