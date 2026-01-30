@@ -1,0 +1,166 @@
+use anyhow::{Ok, Result};
+use async_trait::async_trait;
+use diesel::{delete, insert_into, prelude::*, update};
+use std::sync::Arc;
+use uuid::Uuid;
+
+use crate::{
+    domain::{
+        entities::{
+            permission::PermissionEntity,
+            role::RoleEntity,
+            user::{NewUserEntity, UserEntity},
+            user_role::NewUserRoleEntity,
+        },
+        repositories::user_repository::UserRepository,
+    },
+    infrastructure::database::postgres::{
+        postgres_connection::PgPoolSquad,
+        schema::{permissions, role_permissions, roles, user_roles, users},
+    },
+};
+
+pub struct UserPostgres {
+    db_pool: Arc<PgPoolSquad>,
+}
+
+impl UserPostgres {
+    pub fn new(db_pool: Arc<PgPoolSquad>) -> Self {
+        Self { db_pool }
+    }
+}
+
+#[async_trait]
+impl UserRepository for UserPostgres {
+    async fn create(&self, new_user: NewUserEntity) -> Result<Uuid> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = insert_into(users::table)
+            .values(new_user)
+            .returning(users::id)
+            .get_result::<Uuid>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<UserEntity> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::id.eq(id))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn find_by_username(&self, username: String) -> Result<UserEntity> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::username.eq(username))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn find_by_email(&self, email: String) -> Result<UserEntity> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::email.eq(email))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn update_last_login(&self, id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(id)))
+            .set(users::last_login_at.eq(diesel::dsl::now))
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn assign_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let new_assignment = NewUserRoleEntity { user_id, role_id };
+
+        insert_into(user_roles::table)
+            .values(new_assignment)
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn remove_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        delete(
+            user_roles::table
+                .filter(user_roles::user_id.eq(user_id))
+                .filter(user_roles::role_id.eq(role_id)),
+        )
+        .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn get_user_roles(&self, user_id: Uuid) -> Result<Vec<RoleEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let results = user_roles::table
+            .filter(user_roles::user_id.eq(user_id))
+            .inner_join(roles::table)
+            .select(RoleEntity::as_select())
+            .load::<RoleEntity>(&mut conn)?;
+
+        Ok(results)
+    }
+
+    async fn get_user_permissions(&self, user_id: Uuid) -> Result<Vec<PermissionEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        // Get all permissions from all roles assigned to the user
+        let results = user_roles::table
+            .filter(user_roles::user_id.eq(user_id))
+            .inner_join(roles::table)
+            .inner_join(role_permissions::table.on(roles::id.eq(role_permissions::role_id)))
+            .inner_join(permissions::table.on(role_permissions::permission_id.eq(permissions::id)))
+            .select(PermissionEntity::as_select())
+            .distinct()
+            .load::<PermissionEntity>(&mut conn)?;
+
+        Ok(results)
+    }
+
+    async fn update_profile(
+        &self,
+        user_id: Uuid,
+        display_name_opt: Option<String>,
+        avatar_image_url_opt: Option<String>,
+    ) -> Result<()> {
+        use crate::infrastructure::database::postgres::schema::users::dsl::*;
+
+        let pool = Arc::clone(&self.db_pool);
+
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+
+            // Update display_name if provided
+            if let Some(name) = display_name_opt {
+                diesel::update(users.filter(id.eq(user_id)))
+                    .set(display_name.eq(name))
+                    .execute(&mut conn)?;
+            }
+
+            // Update avatar_image_url if provided
+            if let Some(avatar) = avatar_image_url_opt {
+                diesel::update(users.filter(id.eq(user_id)))
+                    .set(avatar_image_url.eq(Some(avatar)))
+                    .execute(&mut conn)?;
+            }
+
+            Ok(())
+        })
+        .await??;
+
+        Ok(())
+    }
+}

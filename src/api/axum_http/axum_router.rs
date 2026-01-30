@@ -1,29 +1,73 @@
+use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
+use axum::http::Method;
 use axum::{Router, http::StatusCode, routing::get};
 use tokio::net::TcpListener;
 use tokio::signal;
-use tokio::time::sleep;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+use tracing::info;
 
-pub async fn start() {
-    // Create a regular axum app.
+use crate::api::axum_http::{default_routers, middleware, routers};
+use crate::config::{config_loader, config_model::DotEnvyConfig};
+use crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad;
+use crate::services::jwt_service::JwtService;
+
+pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
+    // Initialize JWT service
+    let auth_secrets = config_loader::get_auth_secret_env().expect("Failed to load auth secrets");
+    let jwt_service = Arc::new(JwtService::new(
+        auth_secrets.secret,
+        auth_secrets.refresh_secret,
+    ));
+
     let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
-        .route("/slow", get(|| sleep(Duration::from_secs(5))))
-        .route("/forever", get(std::future::pending::<()>))
-        .layer((
-            TraceLayer::new_for_http(),
-            // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
-            // requests don't hang forever.
-            TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(10)),
-        ));
+        .fallback(default_routers::not_found)
+        .merge(routers::authentication::routes(
+            Arc::clone(&db_pool),
+            Arc::clone(&jwt_service),
+        ))
+        .merge(
+            routers::users::routes(Arc::clone(&db_pool)).layer(axum::middleware::from_fn(
+                move |req, next| {
+                    let jwt_service = Arc::clone(&jwt_service);
+                    async move { middleware::auth_middleware(jwt_service, req, next).await }
+                },
+            )),
+        )
+        .route("/health-check", get(default_routers::health_check))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(config.server.timeout),
+        ))
+        .layer(RequestBodyLimitLayer::new(
+            (config.server.body_limit * 1024 * 1024)
+                .try_into()
+                .expect("body limit too large"),
+        ))
+        .layer(
+            CorsLayer::new()
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ])
+                .allow_origin(Any),
+        )
+        .layer(TraceLayer::new_for_http());
 
-    // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:4000").await.unwrap();
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
 
-    // Run the server with graceful shutdown
+    let listener = TcpListener::bind(addr).await.unwrap();
+
+    info!("Server is running on port {}", config.server.port);
+
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
@@ -49,7 +93,7 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        _ = ctrl_c => info!("Received Ctrl+C, signal"),
+        _ = terminate => info!("Received terminate, signal"),
     }
 }
