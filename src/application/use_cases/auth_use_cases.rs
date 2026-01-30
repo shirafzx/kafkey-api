@@ -3,10 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    domain::{
-        entities::user::UserEntity,
-        repositories::{role_repository::RoleRepository, user_repository::UserRepository},
-    },
+    domain::repositories::{role_repository::RoleRepository, user_repository::UserRepository},
     services::{jwt_service::JwtService, password_service::PasswordService},
 };
 
@@ -35,6 +32,43 @@ where
             role_repository,
             jwt_service,
         }
+    }
+
+    /// Register a new user
+    pub async fn register(
+        &self,
+        username: String,
+        email: String,
+        display_name: String,
+        password: String,
+        avatar_image_url: Option<String>,
+    ) -> Result<Uuid> {
+        // Hash password
+        let password_hash = PasswordService::hash_password(&password)?;
+
+        // Create user entity
+        let new_user = crate::domain::entities::user::NewUserEntity {
+            username,
+            email,
+            display_name,
+            avatar_image_url,
+            password_hash,
+        };
+
+        // Create user
+        let user_id = self.user_repository.create(new_user).await?;
+
+        // Assign default "user" role
+        match self.role_repository.find_by_name("user".to_string()).await {
+            Ok(role) => {
+                if let Err(e) = self.user_repository.assign_role(user_id, role.id).await {
+                    tracing::warn!("Failed to assign default role for user {}: {}", user_id, e);
+                }
+            }
+            Err(e) => tracing::warn!("Failed to find default role during registration: {}", e),
+        }
+
+        Ok(user_id)
     }
 
     /// Authenticate user and generate tokens

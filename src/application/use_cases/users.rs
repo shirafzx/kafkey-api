@@ -52,4 +52,56 @@ where
             .update_profile(user_id, display_name, avatar_image_url)
             .await
     }
+
+    /// Get current user profile with roles - business logic for the GET /users/me endpoint
+    pub async fn get_current_user_profile(
+        &self,
+        user_id_str: &str,
+    ) -> Result<crate::api::axum_http::dtos::UserProfileResponse> {
+        // Parse user ID
+        let user_id =
+            Uuid::parse_str(user_id_str).map_err(|_| anyhow::anyhow!("Invalid user ID format"))?;
+
+        // Get user from database
+        let user = self.user_repository.find_by_id(user_id).await?;
+
+        // Get user roles
+        let roles = self
+            .user_repository
+            .get_user_roles(user_id)
+            .await?
+            .iter()
+            .map(|r| r.name.clone())
+            .collect();
+
+        // Build response
+        Ok(crate::api::axum_http::dtos::UserProfileResponse {
+            id: user.id.to_string(),
+            username: user.username,
+            email: user.email,
+            display_name: user.display_name,
+            avatar_image_url: user.avatar_image_url,
+            is_active: user.is_active.unwrap_or(true),
+            is_verified: user.is_verified.unwrap_or(false),
+            roles,
+            created_at: user.created_at.map(|dt| dt.to_rfc3339()),
+        })
+    }
+
+    /// Update current user profile - business logic for the PUT /users/me endpoint
+    pub async fn update_current_user_profile(
+        &self,
+        user_id_str: &str,
+        display_name: Option<String>,
+        avatar_image_url: Option<String>,
+    ) -> Result<()> {
+        // Parse user ID
+        let user_id =
+            Uuid::parse_str(user_id_str).map_err(|_| anyhow::anyhow!("Invalid user ID format"))?;
+
+        // Update profile
+        self.user_repository
+            .update_profile(user_id, display_name, avatar_image_url)
+            .await
+    }
 }

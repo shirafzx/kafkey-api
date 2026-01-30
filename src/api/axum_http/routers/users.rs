@@ -7,10 +7,9 @@ use axum::{
     response::IntoResponse,
     routing::{get, put},
 };
-use uuid::Uuid;
 
 use crate::{
-    api::axum_http::dtos::{UpdateProfileRequest, UserProfileResponse},
+    api::axum_http::dtos::UpdateProfileRequest,
     application::use_cases::users::UserUseCases,
     infrastructure::database::postgres::{
         postgres_connection::PgPoolSquad, repositories::user_repository::UserPostgres,
@@ -32,38 +31,16 @@ async fn get_current_user(
     Extension(claims): Extension<TokenClaims>,
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
 ) -> impl IntoResponse {
-    // Parse user ID from token claims
-    let user_id = match Uuid::parse_str(&claims.sub) {
-        Ok(id) => id,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid user ID").into_response(),
-    };
-
-    // Get user from database
-    let user = match user_use_case.get_user_by_id(user_id).await {
-        Ok(user) => user,
-        Err(_) => return (StatusCode::NOT_FOUND, "User not found").into_response(),
-    };
-
-    // Get user roles
-    let roles = match user_use_case.get_user_roles(user_id).await {
-        Ok(roles) => roles.iter().map(|r| r.name.clone()).collect(),
-        Err(_) => Vec::new(),
-    };
-
-    // Build response
-    let response = UserProfileResponse {
-        id: user.id.to_string(),
-        username: user.username,
-        email: user.email,
-        display_name: user.display_name,
-        avatar_image_url: user.avatar_image_url,
-        is_active: user.is_active.unwrap_or(true),
-        is_verified: user.is_verified.unwrap_or(false),
-        roles,
-        created_at: user.created_at.map(|dt| dt.to_rfc3339()),
-    };
-
-    (StatusCode::OK, Json(response)).into_response()
+    match user_use_case.get_current_user_profile(&claims.sub).await {
+        Ok(profile) => (StatusCode::OK, Json(profile)).into_response(),
+        Err(e) if e.to_string().contains("Invalid user ID") => {
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
+        Err(e) if e.to_string().contains("not found") => {
+            (StatusCode::NOT_FOUND, e.to_string()).into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 async fn update_current_user(
@@ -71,15 +48,8 @@ async fn update_current_user(
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
     Json(request): Json<UpdateProfileRequest>,
 ) -> impl IntoResponse {
-    // Parse user ID from token claims
-    let user_id = match Uuid::parse_str(&claims.sub) {
-        Ok(id) => id,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid user ID").into_response(),
-    };
-
-    // Update user profile
     match user_use_case
-        .update_user_profile(user_id, request.display_name, request.avatar_image_url)
+        .update_current_user_profile(&claims.sub, request.display_name, request.avatar_image_url)
         .await
     {
         Ok(_) => (
@@ -89,6 +59,9 @@ async fn update_current_user(
             })),
         )
             .into_response(),
+        Err(e) if e.to_string().contains("Invalid user ID") => {
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
