@@ -4,7 +4,7 @@ use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post
 
 use crate::{
     application::dtos::{AuthResponse, LoginRequest, RefreshTokenRequest, RegisterRequest},
-    application::use_cases::{auth_use_cases::AuthUseCases, users::UserUseCases},
+    application::use_cases::{auth::AuthUseCases, users::UserUseCases},
     infrastructure::database::postgres::{
         postgres_connection::PgPoolSquad,
         repositories::{

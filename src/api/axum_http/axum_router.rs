@@ -53,7 +53,7 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
 
     let app = Router::new()
         .fallback(default_routers::not_found)
-        .merge(routers::authentication::routes(
+        .merge(routers::auth::routes(
             Arc::clone(&db_pool),
             Arc::clone(&jwt_service),
         ))
