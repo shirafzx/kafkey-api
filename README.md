@@ -97,33 +97,37 @@ All API responses follow this consistent format:
 
 ## 🏗️ Project Architecture
 
-The project follows **Clean Architecture** principles to separate concerns and ensure maintainability:
+The project follows **Clean Architecture** principles to separate concerns and ensure maintainability.
+
+### 📂 Directory Structure
 
 ```text
 src/
-├── api/              # Interface Adapters
-│   ├── axum_http/    # HTTP implementation using Axum
-│   │   ├── routers/  # Route definitions & Handlers
-│   │   ├── middleware/# Auth, CSRF, Rate-Limit, Logging
-│   │   └── extractors/# Custom request handlers (ValidatedJson)
-├── application/      # Application Business Rules
-│   ├── use_cases/    # Application logic orchestrating entities
-│   └── dtos/         # Data Transfer Objects for API contracts
-├── domain/           # Enterprise Business Rules
-│   ├── entities/     # core domain models (User, Role, Permission)
-│   └── repositories/ # Traits defining storage interfaces
-├── infrastructure/   # Frameworks & Drivers
-│   └── database/     # Concrete implementations (PostgreSQL/Diesel)
-└── services/         # Domain-agnostic utilities
-    └── jwt_service   # Token generation & validation
+├── api/                  # Interface Adapters (HTTP, Controllers)
+│   └── axum_http/
+│       ├── routers/
+│       ├── middleware/
+│       └── extractors/
+├── application/          # Business Logic (Use Cases)
+│   ├── use_cases/
+│   └── dtos/
+├── domain/               # Core Domain (Entities, Interfaces)
+│   ├── entities/
+│   └── repositories/
+├── infrastructure/       # External Adapter (DB, Config)
+│   └── database/
+└── services/             # Shared Services (JWT, Hashing)
 ```
 
-### 🧱 Layer Responsibilities
+### 🧱 Component Responsibilities
 
-1.  **API Layer (`src/api`)**: Handles HTTP requests, maps them to DTOs, and delegates to Use Cases. It knows about the web framework (Axum) but nothing about the database.
-2.  **Application Layer (`src/application`)**: Contains business logic (Use Cases). It orchestrates the flow of data between the API layer and the Domain layer.
-3.  **Domain Layer (`src/domain`)**: The core of the application. Defines entities and repository interfaces (Traits). It has **zero dependencies** on outer layers.
-4.  **Infrastructure Layer (`src/infrastructure`)**: Implements external concerns like Database access. It depends on the Domain layer (interfaces) but the Domain layer does not depend on it.
+| Layer              | Directory            | Responsibility                                                                                                                                  |
+| ------------------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **API**            | `src/api`            | **Entry Point**. Handles HTTP requests, validation, and middleware. Delegates work to the Application layer. Unaware of DB implementation.      |
+| **Application**    | `src/application`    | **Orchestration**. Contains specific Use Cases (e.g., `Login`, `Register`). Coordinates data flow between API and Domain.                       |
+| **Domain**         | `src/domain`         | **The Core**. Defines pure business entities (`User`) and abstract repository traits (`UserRepository`). **Zero dependencies** on outer layers. |
+| **Infrastructure** | `src/infrastructure` | **Implementation**. Concrete implementations of repository traits (e.g., `PostgresUserRepository`) and DB connections.                          |
+| **Services**       | `src/services`       | **Utilities**. Domain-agnostic helper services like Password Hashing or JWT Token generation.                                                   |
 
 ## 🔐 Security Considerations
 
