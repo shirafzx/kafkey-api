@@ -1,5 +1,5 @@
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
@@ -13,6 +13,7 @@ use crate::{
     application::dtos::{CreateRoleRequest, PermissionResponse, RoleResponse, UpdateRoleRequest},
     application::use_cases::roles::RoleUseCases,
     infrastructure::database::postgres::repositories::role_repository::RolePostgres,
+    services::jwt_service::TokenClaims,
 };
 
 pub fn routes(
@@ -104,11 +105,24 @@ async fn list_roles(
 }
 
 async fn create_role(
+    Extension(claims): Extension<TokenClaims>,
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
     Json(request): Json<CreateRoleRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match role_use_case
-        .create_role(request.name, request.description)
+        .create_role(actor_id, request.name, request.description)
         .await
     {
         Ok(id) => success_response(
@@ -149,12 +163,25 @@ async fn get_role_by_id(
 }
 
 async fn update_role(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
     Json(request): Json<UpdateRoleRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match role_use_case
-        .update_role(id, request.name, request.description)
+        .update_role(actor_id, id, request.name, request.description)
         .await
     {
         Ok(_) => success_response(
@@ -172,10 +199,23 @@ async fn update_role(
 }
 
 async fn delete_role(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
 ) -> impl IntoResponse {
-    match role_use_case.delete_role(id).await {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
+    match role_use_case.delete_role(actor_id, id).await {
         Ok(_) => success_response(
             "DELETE_ROLE_SUCCESS",
             "Role deleted successfully",
@@ -228,12 +268,25 @@ struct AssignPermissionRequest {
 }
 
 async fn assign_permission(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
     Json(request): Json<AssignPermissionRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match role_use_case
-        .assign_permission(id, request.permission_id)
+        .assign_permission(actor_id, id, request.permission_id)
         .await
     {
         Ok(_) => success_response(
@@ -251,11 +304,24 @@ async fn assign_permission(
 }
 
 async fn remove_permission(
+    Extension(claims): Extension<TokenClaims>,
     Path((role_id, permission_id)): Path<(Uuid, Uuid)>,
     State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match role_use_case
-        .remove_permission(role_id, permission_id)
+        .remove_permission(actor_id, role_id, permission_id)
         .await
     {
         Ok(_) => success_response(

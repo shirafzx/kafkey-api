@@ -24,8 +24,24 @@ where
         Ok(user_id)
     }
 
-    pub async fn assign_default_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()> {
-        self.user_repository.assign_role(user_id, role_id).await
+    pub async fn assign_default_role(
+        &self,
+        actor_id: Uuid,
+        user_id: Uuid,
+        role_id: Uuid,
+    ) -> Result<()> {
+        self.user_repository.assign_role(user_id, role_id).await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_USER_ROLE_ASSIGNED",
+            actor_id = %actor_id,
+            target_id = %user_id,
+            role_id = %role_id,
+            "Administrative action: Role assigned to user"
+        );
+
+        Ok(())
     }
 
     pub async fn get_user_by_id(
@@ -130,12 +146,23 @@ where
         Ok((items, total))
     }
 
-    pub async fn delete_user(&self, id: Uuid) -> Result<()> {
-        self.user_repository.delete(id).await
+    pub async fn delete_user(&self, actor_id: Uuid, id: Uuid) -> Result<()> {
+        self.user_repository.delete(id).await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_USER_DELETED",
+            actor_id = %actor_id,
+            target_id = %id,
+            "Administrative action: User deleted"
+        );
+
+        Ok(())
     }
 
     pub async fn admin_update_user(
         &self,
+        actor_id: Uuid,
         user_id: Uuid,
         display_name: Option<String>,
         avatar_image_url: Option<String>,
@@ -164,10 +191,31 @@ where
                 two_factor_enabled,
                 two_factor_backup_codes,
             )
-            .await
+            .await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_USER_UPDATED_ADMIN",
+            actor_id = %actor_id,
+            target_id = %user_id,
+            "Administrative action: User updated by admin"
+        );
+
+        Ok(())
     }
 
-    pub async fn remove_role(&self, user_id: Uuid, role_id: Uuid) -> Result<()> {
-        self.user_repository.remove_role(user_id, role_id).await
+    pub async fn remove_role(&self, actor_id: Uuid, user_id: Uuid, role_id: Uuid) -> Result<()> {
+        self.user_repository.remove_role(user_id, role_id).await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_USER_ROLE_REMOVED",
+            actor_id = %actor_id,
+            target_id = %user_id,
+            role_id = %role_id,
+            "Administrative action: Role removed from user"
+        );
+
+        Ok(())
     }
 }

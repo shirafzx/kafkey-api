@@ -26,18 +26,30 @@ where
 
     pub async fn create_permission(
         &self,
+        actor_id: Uuid,
         name: String,
         resource: String,
         action: String,
         description: Option<String>,
     ) -> Result<Uuid> {
         let new_permission = crate::domain::entities::permission::NewPermissionEntity {
-            name,
+            name: name.clone(),
             resource,
             action,
             description,
         };
-        self.permission_repository.create(new_permission).await
+        let permission_id = self.permission_repository.create(new_permission).await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_PERMISSION_CREATED",
+            actor_id = %actor_id,
+            target_id = %permission_id,
+            permission_name = %name,
+            "Administrative action: Permission created"
+        );
+
+        Ok(permission_id)
     }
 
     pub async fn get_permission_by_id(&self, id: Uuid) -> Result<PermissionEntity> {
@@ -50,16 +62,38 @@ where
 
     pub async fn update_permission(
         &self,
+        actor_id: Uuid,
         id: Uuid,
         name: Option<String>,
         description: Option<String>,
     ) -> Result<()> {
         self.permission_repository
-            .update(id, name, description)
-            .await
+            .update(id, name.clone(), description.clone())
+            .await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_PERMISSION_UPDATED",
+            actor_id = %actor_id,
+            target_id = %id,
+            permission_name = ?name,
+            "Administrative action: Permission updated"
+        );
+
+        Ok(())
     }
 
-    pub async fn delete_permission(&self, id: Uuid) -> Result<()> {
-        self.permission_repository.delete(id).await
+    pub async fn delete_permission(&self, actor_id: Uuid, id: Uuid) -> Result<()> {
+        self.permission_repository.delete(id).await?;
+
+        tracing::info!(
+            audit = true,
+            event = "AUDIT_PERMISSION_DELETED",
+            actor_id = %actor_id,
+            target_id = %id,
+            "Administrative action: Permission deleted"
+        );
+
+        Ok(())
     }
 }

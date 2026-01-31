@@ -241,12 +241,26 @@ async fn get_user_by_id(
 }
 
 async fn admin_update_user(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
     ValidatedJson(request): ValidatedJson<AdminUpdateUserRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match user_use_case
         .admin_update_user(
+            actor_id,
             id,
             request.display_name,
             request.avatar_image_url,
@@ -277,10 +291,23 @@ async fn admin_update_user(
 }
 
 async fn delete_user(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
-    match user_use_case.delete_user(id).await {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
+    match user_use_case.delete_user(actor_id, id).await {
         Ok(_) => success_response(
             "DELETE_USER_SUCCESS",
             "User deleted successfully",
@@ -302,12 +329,25 @@ struct AssignRoleRequest {
 }
 
 async fn assign_role(
+    Extension(claims): Extension<TokenClaims>,
     Path(user_id): Path<Uuid>,
     State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
     Json(request): Json<AssignRoleRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match user_use_case
-        .assign_default_role(user_id, request.role_id)
+        .assign_default_role(actor_id, user_id, request.role_id)
         .await
     {
         Ok(_) => success_response(
@@ -325,10 +365,23 @@ async fn assign_role(
 }
 
 async fn remove_role(
+    Extension(claims): Extension<TokenClaims>,
     Path((user_id, role_id)): Path<(Uuid, Uuid)>,
     State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
-    match user_use_case.remove_role(user_id, role_id).await {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
+    match user_use_case.remove_role(actor_id, user_id, role_id).await {
         Ok(_) => success_response(
             "REMOVE_ROLE_SUCCESS",
             "Role removed successfully",

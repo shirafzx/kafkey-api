@@ -1,5 +1,5 @@
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
@@ -13,6 +13,7 @@ use crate::{
     application::dtos::{CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest},
     application::use_cases::permissions::PermissionUseCases,
     infrastructure::database::postgres::repositories::permission_repository::PermissionPostgres,
+    services::jwt_service::TokenClaims,
 };
 use axum::routing::{delete, post, put};
 
@@ -89,11 +90,25 @@ async fn list_permissions(
 }
 
 async fn create_permission(
+    Extension(claims): Extension<TokenClaims>,
     State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
     Json(request): Json<CreatePermissionRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match permission_use_case
         .create_permission(
+            actor_id,
             request.name,
             request.resource,
             request.action,
@@ -141,12 +156,25 @@ async fn get_permission_by_id(
 }
 
 async fn update_permission(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
     Json(request): Json<UpdatePermissionRequest>,
 ) -> impl IntoResponse {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
     match permission_use_case
-        .update_permission(id, request.name, request.description)
+        .update_permission(actor_id, id, request.name, request.description)
         .await
     {
         Ok(_) => success_response(
@@ -164,10 +192,23 @@ async fn update_permission(
 }
 
 async fn delete_permission(
+    Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
     State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
 ) -> impl IntoResponse {
-    match permission_use_case.delete_permission(id).await {
+    let actor_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_ACTOR_ID",
+                "Invalid actor ID in token",
+                None,
+            );
+        }
+    };
+
+    match permission_use_case.delete_permission(actor_id, id).await {
         Ok(_) => success_response(
             "DELETE_PERMISSION_SUCCESS",
             "Permission deleted successfully",
