@@ -92,6 +92,7 @@ All API responses follow this consistent format:
 ## 📂 Documentation
 
 - 📄 [Detailed API Specification](docs/API.md) - Full endpoint lists and examples.
+- 🗄️ [Database Schema](docs/DATABASE.md) - Tables, relationships, and indexes.
 - 📊 [System Diagrams](docs/DIAGRAMS.md) - Visual sequence diagrams for Auth and AuthZ flows.
 - 📝 [Development Tasks](TASKS.md) - Roadmap and completed features.
 
