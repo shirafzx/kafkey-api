@@ -30,10 +30,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from the builder stage
-COPY --from=builder /usr/src/app/target/release/kafkey_api .
+COPY --from=builder /usr/src/app/target/release/kafkey-api .
 
 # Expose the API port
 EXPOSE 8080
 
 # Run the binary
-CMD ["./kafkey_api"]
+CMD ["./kafkey-api"]
