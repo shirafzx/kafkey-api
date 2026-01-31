@@ -1,5 +1,5 @@
 # Build Stage
-FROM rust:1.84-bullseye AS builder
+FROM rust:1.93-bullseye AS builder
 
 WORKDIR /usr/src/app
 
