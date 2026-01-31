@@ -92,15 +92,24 @@
 
 ---
 
-## 🚧 In Progress / TODO
-
-### Monitoring & Logging
+### Phase 11: Monitoring & Logging
 
 - [x] Add structured logging for authentication events
 - [x] Implement audit logging for admin actions
 - [x] Add metrics collection (Prometheus/OpenTelemetry)
 - [x] Set up health check endpoints with database connectivity
 - [x] Add error tracking integration (Sentry, etc.)
+
+### Phase 12: Persistent Auditing (MongoDB)
+
+- [x] Integrate MongoDB client and connection pooling
+- [x] Implement persistent audit logging for administrative actions
+- [x] Standardize UUID storage using BSON Subtype 4
+- [x] Refactor MongoDB infrastructure for modularity
+
+---
+
+## 🚧 In Progress / TODO
 
 ### DevOps & Deployment
 

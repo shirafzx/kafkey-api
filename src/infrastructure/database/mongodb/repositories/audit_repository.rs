@@ -22,9 +22,11 @@ impl AuditRepository for AuditMongodb {
     async fn create(&self, new_audit: NewAuditLogEntity) -> Result<()> {
         let audit_log = AuditLogEntity {
             id: None,
-            actor_id: new_audit.actor_id,
+            actor_id: mongodb::bson::Uuid::from_bytes(new_audit.actor_id.into_bytes()),
             event_type: new_audit.event_type,
-            target_id: new_audit.target_id,
+            target_id: new_audit
+                .target_id
+                .map(|uuid| mongodb::bson::Uuid::from_bytes(uuid.into_bytes())),
             resource: new_audit.resource,
             action: new_audit.action,
             metadata: new_audit.metadata,

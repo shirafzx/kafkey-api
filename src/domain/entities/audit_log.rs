@@ -6,9 +6,9 @@ use uuid::Uuid;
 pub struct AuditLogEntity {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    pub actor_id: Uuid,
+    pub actor_id: mongodb::bson::Uuid,
     pub event_type: String,
-    pub target_id: Option<Uuid>,
+    pub target_id: Option<mongodb::bson::Uuid>,
     pub resource: String,
     pub action: String,
     pub metadata: serde_json::Value,
