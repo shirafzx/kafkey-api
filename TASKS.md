@@ -98,7 +98,7 @@
 
 - [x] Add structured logging for authentication events
 - [x] Implement audit logging for admin actions
-- [ ] Add metrics collection (Prometheus/OpenTelemetry)
+- [x] Add metrics collection (Prometheus/OpenTelemetry)
 - [x] Set up health check endpoints with database connectivity
 - [ ] Add error tracking integration (Sentry, etc.)
 

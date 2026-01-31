@@ -51,8 +51,15 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
     let rate_limit_config = middleware::rate_limit_middleware::RateLimitConfig::default();
     let rate_limit_state = middleware::rate_limit_middleware::RateLimitState::new();
 
+    // Initialize Prometheus metrics
+    let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayerBuilder::new()
+        .with_ignore_patterns(&["/metrics", "/health-check"])
+        .with_default_metrics()
+        .build_pair();
+
     let app = Router::new()
         .fallback(default_routers::not_found)
+        .route("/metrics", get(|| async move { metric_handle.render() }))
         .merge(routers::auth::routes(
             Arc::clone(&db_pool),
             Arc::clone(&jwt_service),
@@ -71,6 +78,7 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
                 })),
         )
         .route("/health-check", get(default_routers::health_check))
+        .layer(prometheus_layer)
         .layer(axum::middleware::from_fn(middleware::csrf_middleware))
         .layer(axum::middleware::from_fn(move |req, next| {
             let state = Arc::clone(&rate_limit_state);

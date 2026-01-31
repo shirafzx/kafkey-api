@@ -32,3 +32,4 @@ rand = "0.8.5"
 axum-extra = { version = "0.10", features = ["cookie"] }
 validator = { version = "0.19", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
+axum-prometheus = "0.10.0"
