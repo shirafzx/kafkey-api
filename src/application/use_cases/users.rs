@@ -2,21 +2,29 @@ use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::application::use_cases::audit::AuditUseCases;
+use crate::domain::repositories::audit_repository::AuditRepository;
 use crate::domain::{entities::user::NewUserEntity, repositories::user_repository::UserRepository};
 
-pub struct UserUseCases<T>
+pub struct UserUseCases<T, AR>
 where
     T: UserRepository + Send + Sync,
+    AR: AuditRepository + Send + Sync,
 {
     user_repository: Arc<T>,
+    audit_use_case: Arc<AuditUseCases<AR>>,
 }
 
-impl<T> UserUseCases<T>
+impl<T, AR> UserUseCases<T, AR>
 where
     T: UserRepository + Send + Sync,
+    AR: AuditRepository + Send + Sync,
 {
-    pub fn new(user_repository: Arc<T>) -> Self {
-        Self { user_repository }
+    pub fn new(user_repository: Arc<T>, audit_use_case: Arc<AuditUseCases<AR>>) -> Self {
+        Self {
+            user_repository,
+            audit_use_case,
+        }
     }
 
     pub async fn create_user(&self, new_user: NewUserEntity) -> Result<Uuid> {
@@ -31,6 +39,18 @@ where
         role_id: Uuid,
     ) -> Result<()> {
         self.user_repository.assign_role(user_id, role_id).await?;
+
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_USER_ROLE_ASSIGNED",
+                Some(user_id),
+                "user",
+                "assign_role",
+                serde_json::json!({ "role_id": role_id.to_string() }),
+            )
+            .await
+            .ok();
 
         tracing::info!(
             audit = true,
@@ -149,6 +169,18 @@ where
     pub async fn delete_user(&self, actor_id: Uuid, id: Uuid) -> Result<()> {
         self.user_repository.delete(id).await?;
 
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_USER_DELETED",
+                Some(id),
+                "user",
+                "delete",
+                serde_json::json!({}),
+            )
+            .await
+            .ok();
+
         tracing::info!(
             audit = true,
             event = "AUDIT_USER_DELETED",
@@ -179,7 +211,7 @@ where
         self.user_repository
             .admin_update(
                 user_id,
-                display_name,
+                display_name.clone(),
                 avatar_image_url,
                 is_active,
                 is_verified,
@@ -192,6 +224,22 @@ where
                 two_factor_backup_codes,
             )
             .await?;
+
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_USER_UPDATED_ADMIN",
+                Some(user_id),
+                "user",
+                "admin_update",
+                serde_json::json!({
+                    "display_name": display_name,
+                    "is_active": is_active,
+                    "is_verified": is_verified,
+                }),
+            )
+            .await
+            .ok();
 
         tracing::info!(
             audit = true,
@@ -206,6 +254,18 @@ where
 
     pub async fn remove_role(&self, actor_id: Uuid, user_id: Uuid, role_id: Uuid) -> Result<()> {
         self.user_repository.remove_role(user_id, role_id).await?;
+
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_USER_ROLE_REMOVED",
+                Some(user_id),
+                "user",
+                "remove_role",
+                serde_json::json!({ "role_id": role_id.to_string() }),
+            )
+            .await
+            .ok();
 
         tracing::info!(
             audit = true,

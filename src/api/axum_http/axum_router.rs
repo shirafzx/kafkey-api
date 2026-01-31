@@ -13,12 +13,18 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::api::axum_http::{default_routers, middleware, routers};
+use crate::application::use_cases::audit::AuditUseCases;
 use crate::config::{config_loader, config_model::DotEnvyConfig};
 use crate::domain::repositories::blacklist_repository::BlacklistRepository;
+use crate::infrastructure::database::mongodb::repositories::audit_repository::AuditMongodb;
 use crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad;
 use crate::services::jwt_service::JwtService;
 
-pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
+pub async fn start(
+    config: Arc<DotEnvyConfig>,
+    db_pool: Arc<PgPoolSquad>,
+    mongodb_client: mongodb::Client,
+) {
     // Initialize JWT service
     let auth_secrets = config_loader::get_auth_secret_env().expect("Failed to load auth secrets");
     let jwt_service = Arc::new(JwtService::new(
@@ -57,17 +63,28 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
         .with_default_metrics()
         .build_pair();
 
+    // Initialize MongoDB Audit repository and use cases
+    let audit_repository = Arc::new(AuditMongodb::new(&mongodb_client));
+    let audit_use_cases = Arc::new(AuditUseCases::new(Arc::clone(&audit_repository)));
+
     let app = Router::new()
         .fallback(default_routers::not_found)
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .merge(routers::auth::routes(
             Arc::clone(&db_pool),
             Arc::clone(&jwt_service),
+            Arc::clone(&audit_use_cases),
         ))
         .merge(
-            routers::users::routes(Arc::clone(&db_pool))
-                .merge(routers::roles::routes(Arc::clone(&db_pool)))
-                .merge(routers::permissions::routes(Arc::clone(&db_pool)))
+            routers::users::routes(Arc::clone(&db_pool), Arc::clone(&audit_use_cases))
+                .merge(routers::roles::routes(
+                    Arc::clone(&db_pool),
+                    Arc::clone(&audit_use_cases),
+                ))
+                .merge(routers::permissions::routes(
+                    Arc::clone(&db_pool),
+                    Arc::clone(&audit_use_cases),
+                ))
                 .layer(axum::middleware::from_fn(move |req, next| {
                     let jwt_service = Arc::clone(&jwt_service);
                     let blacklist_repository = Arc::clone(&blacklist_repository);

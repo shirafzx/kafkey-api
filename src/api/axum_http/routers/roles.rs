@@ -8,6 +8,8 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::application::use_cases::audit::AuditUseCases;
+use crate::domain::repositories::audit_repository::AuditRepository;
 use crate::{
     api::axum_http::middleware::require_permission,
     application::dtos::{CreateRoleRequest, PermissionResponse, RoleResponse, UpdateRoleRequest},
@@ -16,11 +18,12 @@ use crate::{
     services::jwt_service::TokenClaims,
 };
 
-pub fn routes(
+pub fn routes<AR: AuditRepository + 'static>(
     db_pool: Arc<crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad>,
+    audit_use_case: Arc<AuditUseCases<AR>>,
 ) -> Router {
     let role_repo = Arc::new(RolePostgres::new(db_pool));
-    let role_use_case = Arc::new(RoleUseCases::new(role_repo));
+    let role_use_case = Arc::new(RoleUseCases::new(role_repo, audit_use_case));
 
     Router::new()
         .route(
@@ -76,8 +79,8 @@ pub fn routes(
 
 use crate::api::axum_http::response_utils::{error_response, success_response};
 
-async fn list_roles(
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+async fn list_roles<AR: AuditRepository + 'static>(
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
 ) -> impl IntoResponse {
     match role_use_case.list_roles().await {
         Ok(roles) => {
@@ -104,9 +107,9 @@ async fn list_roles(
     }
 }
 
-async fn create_role(
+async fn create_role<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
     Json(request): Json<CreateRoleRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -139,9 +142,9 @@ async fn create_role(
     }
 }
 
-async fn get_role_by_id(
+async fn get_role_by_id<AR: AuditRepository + 'static>(
     Path(id): Path<Uuid>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
 ) -> impl IntoResponse {
     match role_use_case.get_role_by_id(id).await {
         Ok(r) => success_response(
@@ -162,10 +165,10 @@ async fn get_role_by_id(
     }
 }
 
-async fn update_role(
+async fn update_role<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
     Json(request): Json<UpdateRoleRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -198,10 +201,10 @@ async fn update_role(
     }
 }
 
-async fn delete_role(
+async fn delete_role<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
@@ -230,9 +233,9 @@ async fn delete_role(
     }
 }
 
-async fn get_role_permissions(
+async fn get_role_permissions<AR: AuditRepository + 'static>(
     Path(id): Path<Uuid>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
 ) -> impl IntoResponse {
     match role_use_case.get_role_permissions(id).await {
         Ok(perms) => {
@@ -267,10 +270,10 @@ struct AssignPermissionRequest {
     permission_id: Uuid,
 }
 
-async fn assign_permission(
+async fn assign_permission<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
     Json(request): Json<AssignPermissionRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -303,10 +306,10 @@ async fn assign_permission(
     }
 }
 
-async fn remove_permission(
+async fn remove_permission<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path((role_id, permission_id)): Path<(Uuid, Uuid)>,
-    State(role_use_case): State<Arc<RoleUseCases<RolePostgres>>>,
+    State(role_use_case): State<Arc<RoleUseCases<RolePostgres, AR>>>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,

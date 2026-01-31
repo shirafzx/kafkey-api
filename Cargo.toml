@@ -36,3 +36,4 @@ axum-prometheus = "0.10.0"
 sentry = { version = "0.36", features = ["tower-axum-matched-path"] }
 sentry-tracing = "0.36"
 sentry-tower = "0.36"
+mongodb = { version = "3.1" }

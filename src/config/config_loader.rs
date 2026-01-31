@@ -25,6 +25,7 @@ pub fn load() -> Result<DotEnvyConfig> {
 
     let database = Database {
         url: std::env::var("DATABASE_URL").expect("DATABASE_URL is invalid"),
+        mongodb_url: std::env::var("MONGODB_URL").expect("MONGODB_URL is invalid"),
         max_connections: std::env::var("DATABASE_MAX_CONNECTIONS")
             .unwrap_or("10".to_string())
             .parse()?,

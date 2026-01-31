@@ -8,6 +8,8 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::application::use_cases::audit::AuditUseCases;
+use crate::domain::repositories::audit_repository::AuditRepository;
 use crate::{
     api::axum_http::middleware::require_permission,
     application::dtos::{CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest},
@@ -17,11 +19,12 @@ use crate::{
 };
 use axum::routing::{delete, post, put};
 
-pub fn routes(
+pub fn routes<AR: AuditRepository + 'static>(
     db_pool: Arc<crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad>,
+    audit_use_case: Arc<AuditUseCases<AR>>,
 ) -> Router {
     let permission_repo = Arc::new(PermissionPostgres::new(db_pool));
-    let permission_use_case = Arc::new(PermissionUseCases::new(permission_repo));
+    let permission_use_case = Arc::new(PermissionUseCases::new(permission_repo, audit_use_case));
 
     Router::new()
         .route(
@@ -59,8 +62,8 @@ pub fn routes(
 
 use crate::api::axum_http::response_utils::{error_response, success_response};
 
-async fn list_permissions(
-    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
+async fn list_permissions<AR: AuditRepository + 'static>(
+    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres, AR>>>,
 ) -> impl IntoResponse {
     match permission_use_case.list_permissions().await {
         Ok(perms) => {
@@ -89,9 +92,9 @@ async fn list_permissions(
     }
 }
 
-async fn create_permission(
+async fn create_permission<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
-    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
+    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres, AR>>>,
     Json(request): Json<CreatePermissionRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -130,9 +133,9 @@ async fn create_permission(
     }
 }
 
-async fn get_permission_by_id(
+async fn get_permission_by_id<AR: AuditRepository + 'static>(
     Path(id): Path<Uuid>,
-    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
+    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres, AR>>>,
 ) -> impl IntoResponse {
     match permission_use_case.get_permission_by_id(id).await {
         Ok(p) => success_response(
@@ -155,10 +158,10 @@ async fn get_permission_by_id(
     }
 }
 
-async fn update_permission(
+async fn update_permission<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
+    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres, AR>>>,
     Json(request): Json<UpdatePermissionRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -191,10 +194,10 @@ async fn update_permission(
     }
 }
 
-async fn delete_permission(
+async fn delete_permission<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres>>>,
+    State(permission_use_case): State<Arc<PermissionUseCases<PermissionPostgres, AR>>>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,

@@ -2,24 +2,32 @@ use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::application::use_cases::audit::AuditUseCases;
+use crate::domain::repositories::audit_repository::AuditRepository;
 use crate::domain::{
     entities::{permission::PermissionEntity, role::RoleEntity},
     repositories::role_repository::RoleRepository,
 };
 
-pub struct RoleUseCases<R>
+pub struct RoleUseCases<R, AR>
 where
     R: RoleRepository + Send + Sync,
+    AR: AuditRepository + Send + Sync,
 {
     role_repository: Arc<R>,
+    audit_use_case: Arc<AuditUseCases<AR>>,
 }
 
-impl<R> RoleUseCases<R>
+impl<R, AR> RoleUseCases<R, AR>
 where
     R: RoleRepository + Send + Sync,
+    AR: AuditRepository + Send + Sync,
 {
-    pub fn new(role_repository: Arc<R>) -> Self {
-        Self { role_repository }
+    pub fn new(role_repository: Arc<R>, audit_use_case: Arc<AuditUseCases<AR>>) -> Self {
+        Self {
+            role_repository,
+            audit_use_case,
+        }
     }
 
     pub async fn create_role(
@@ -33,6 +41,18 @@ where
             description: description.clone(),
         };
         let role_id = self.role_repository.create(new_role).await?;
+
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_ROLE_CREATED",
+                Some(role_id),
+                "role",
+                "create",
+                serde_json::json!({ "name": name }),
+            )
+            .await
+            .ok();
 
         tracing::info!(
             audit = true,
@@ -65,6 +85,18 @@ where
             .update(id, name.clone(), description.clone())
             .await?;
 
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_ROLE_UPDATED",
+                Some(id),
+                "role",
+                "update",
+                serde_json::json!({ "name": name }),
+            )
+            .await
+            .ok();
+
         tracing::info!(
             audit = true,
             event = "AUDIT_ROLE_UPDATED",
@@ -79,6 +111,18 @@ where
 
     pub async fn delete_role(&self, actor_id: Uuid, id: Uuid) -> Result<()> {
         self.role_repository.delete(id).await?;
+
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_ROLE_DELETED",
+                Some(id),
+                "role",
+                "delete",
+                serde_json::json!({}),
+            )
+            .await
+            .ok();
 
         tracing::info!(
             audit = true,
@@ -101,6 +145,18 @@ where
             .assign_permission(role_id, permission_id)
             .await?;
 
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_ROLE_PERMISSION_ASSIGNED",
+                Some(role_id),
+                "role",
+                "assign_permission",
+                serde_json::json!({ "permission_id": permission_id.to_string() }),
+            )
+            .await
+            .ok();
+
         tracing::info!(
             audit = true,
             event = "AUDIT_ROLE_PERMISSION_ASSIGNED",
@@ -122,6 +178,18 @@ where
         self.role_repository
             .remove_permission(role_id, permission_id)
             .await?;
+
+        self.audit_use_case
+            .log(
+                actor_id,
+                "AUDIT_ROLE_PERMISSION_REMOVED",
+                Some(role_id),
+                "role",
+                "remove_permission",
+                serde_json::json!({ "permission_id": permission_id.to_string() }),
+            )
+            .await
+            .ok();
 
         tracing::info!(
             audit = true,

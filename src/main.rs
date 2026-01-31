@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use kafkey_api::{
-    api::axum_http::axum_router, config::config_loader,
-    infrastructure::database::postgres::postgres_connection,
+    api::axum_http::axum_router,
+    config::config_loader,
+    infrastructure::database::{mongodb::mongodb_connection, postgres::postgres_connection},
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -42,8 +43,13 @@ async fn main() -> anyhow::Result<()> {
         config.database.min_idle,
     )?);
 
+    // Initialize MongoDB client
+    let mongodb_client = mongodb_connection::establish_connection(&config.database.mongodb_url)
+        .await
+        .expect("Failed to initialize MongoDB connection");
+
     // Start the server
-    axum_router::start(config, db_pool).await;
+    axum_router::start(config, db_pool, mongodb_client).await;
 
     Ok(())
 }

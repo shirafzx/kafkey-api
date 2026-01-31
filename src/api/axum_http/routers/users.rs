@@ -9,6 +9,8 @@ use axum::{
 };
 use uuid::Uuid;
 
+use crate::application::use_cases::audit::AuditUseCases;
+use crate::domain::repositories::audit_repository::AuditRepository;
 use crate::{
     api::axum_http::extractors::ValidatedJson,
     api::axum_http::middleware::{require_permission, require_role},
@@ -27,10 +29,16 @@ use crate::{
     services::jwt_service::TokenClaims,
 };
 
-pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
+pub fn routes<AR: AuditRepository + 'static>(
+    db_pool: Arc<PgPoolSquad>,
+    audit_use_case: Arc<AuditUseCases<AR>>,
+) -> Router {
     let pg_user_repo = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
     let user_repository = Arc::new(CachedUserRepository::new(pg_user_repo));
-    let user_use_case = Arc::new(UserUseCases::new(user_repository));
+    let user_use_case = Arc::new(UserUseCases::new(
+        user_repository,
+        Arc::clone(&audit_use_case),
+    ));
 
     Router::new()
         .route("/api/v1/users/me", get(get_current_user))
@@ -90,9 +98,9 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
         .with_state(user_use_case)
 }
 
-async fn get_current_user(
+async fn get_current_user<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
@@ -129,9 +137,9 @@ async fn get_current_user(
     }
 }
 
-async fn update_current_user(
+async fn update_current_user<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
     ValidatedJson(request): ValidatedJson<UpdateProfileRequest>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&claims.sub) {
@@ -163,9 +171,9 @@ async fn update_current_user(
         ),
     }
 }
-async fn list_users(
+async fn list_users<AR: AuditRepository + 'static>(
     Query(params): Query<PaginationParams>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     let (page, page_size) = params.normalize();
 
@@ -213,9 +221,9 @@ async fn list_users(
     }
 }
 
-async fn get_user_by_id(
+async fn get_user_by_id<AR: AuditRepository + 'static>(
     Path(id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_by_id(id).await {
         Ok(u) => success_response(
@@ -240,10 +248,10 @@ async fn get_user_by_id(
     }
 }
 
-async fn admin_update_user(
+async fn admin_update_user<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
     ValidatedJson(request): ValidatedJson<AdminUpdateUserRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -290,10 +298,10 @@ async fn admin_update_user(
     }
 }
 
-async fn delete_user(
+async fn delete_user<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
@@ -328,10 +336,10 @@ struct AssignRoleRequest {
     role_id: Uuid,
 }
 
-async fn assign_role(
+async fn assign_role<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path(user_id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
     Json(request): Json<AssignRoleRequest>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
@@ -364,10 +372,10 @@ async fn assign_role(
     }
 }
 
-async fn remove_role(
+async fn remove_role<AR: AuditRepository + 'static>(
     Extension(claims): Extension<TokenClaims>,
     Path((user_id, role_id)): Path<(Uuid, Uuid)>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     let actor_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
@@ -396,9 +404,9 @@ async fn remove_role(
     }
 }
 
-async fn get_user_roles(
+async fn get_user_roles<AR: AuditRepository + 'static>(
     Path(user_id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_roles(user_id).await {
         Ok(roles) => {
@@ -425,9 +433,9 @@ async fn get_user_roles(
     }
 }
 
-async fn get_user_permissions(
+async fn get_user_permissions<AR: AuditRepository + 'static>(
     Path(user_id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_permissions(user_id).await {
         Ok(perms) => {

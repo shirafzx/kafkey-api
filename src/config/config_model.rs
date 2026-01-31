@@ -15,6 +15,7 @@ pub struct Server {
 #[derive(Debug, Clone)]
 pub struct Database {
     pub url: String,
+    pub mongodb_url: String,
     pub max_connections: u32,
     pub min_idle: Option<u32>,
 }

@@ -1,3 +1,4 @@
+pub mod audit_log;
 pub mod blacklisted_token;
 pub mod permission;
 pub mod role;
