@@ -33,3 +33,6 @@ axum-extra = { version = "0.10", features = ["cookie"] }
 validator = { version = "0.19", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
 axum-prometheus = "0.10.0"
+sentry = { version = "0.36", features = ["tower-axum-matched-path"] }
+sentry-tracing = "0.36"
+sentry-tower = "0.36"

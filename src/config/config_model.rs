@@ -9,6 +9,7 @@ pub struct Server {
     pub port: u16,
     pub body_limit: u64,
     pub timeout: u64,
+    pub sentry_dsn: Option<String>,
 }
 
 #[derive(Debug, Clone)]

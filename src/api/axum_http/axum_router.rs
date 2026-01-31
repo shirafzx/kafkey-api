@@ -79,6 +79,7 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
         )
         .route("/health-check", get(default_routers::health_check))
         .layer(prometheus_layer)
+        .layer(sentry_tower::SentryHttpLayer::with_transaction())
         .layer(axum::middleware::from_fn(middleware::csrf_middleware))
         .layer(axum::middleware::from_fn(move |req, next| {
             let state = Arc::clone(&rate_limit_state);

@@ -20,6 +20,7 @@ pub fn load() -> Result<DotEnvyConfig> {
         timeout: std::env::var("SERVER_TIMEOUT")
             .expect("SERVER_TIMEOUT is invalid")
             .parse()?,
+        sentry_dsn: std::env::var("SENTRY_DSN").ok(),
     };
 
     let database = Database {

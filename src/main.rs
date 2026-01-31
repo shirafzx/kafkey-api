@@ -8,6 +8,18 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load configuration
+    let config = Arc::new(config_loader::load()?);
+
+    // Initialize Sentry
+    let _guard = sentry::init((
+        config.server.sentry_dsn.as_deref(),
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            ..Default::default()
+        },
+    ));
+
     // Enable tracing.
     tracing_subscriber::registry()
         .with(
@@ -20,10 +32,8 @@ async fn main() -> anyhow::Result<()> {
             }),
         )
         .with(tracing_subscriber::fmt::layer())
+        .with(sentry_tracing::layer())
         .init();
-
-    // Load configuration
-    let config = Arc::new(config_loader::load()?);
 
     // Get database connection pool
     let db_pool = Arc::new(postgres_connection::establish_connection(
