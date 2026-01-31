@@ -39,10 +39,16 @@ pub trait UserRepository {
         avatar_image_url: Option<String>,
         is_active: Option<bool>,
         is_verified: Option<bool>,
+        verification_token: Option<Option<String>>,
+        verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
     ) -> Result<()>;
 
     async fn find_all(&self) -> Result<Vec<UserEntity>>;
     async fn find_paginated(&self, limit: i64, offset: i64) -> Result<Vec<UserEntity>>;
     async fn count(&self) -> Result<i64>;
     async fn delete(&self, id: Uuid) -> Result<()>;
+
+    // Verification
+    async fn find_by_verification_token(&self, token: String) -> Result<Option<UserEntity>>;
+    async fn mark_as_verified(&self, id: Uuid) -> Result<()>;
 }

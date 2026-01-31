@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
-use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{
+    Json, Router,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+};
 
 use crate::{
     application::dtos::{AuthResponse, LoginRequest, RefreshTokenRequest, RegisterRequest},
@@ -36,6 +41,11 @@ pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router
         .route("/api/v1/auth/login", post(login))
         .route("/api/v1/auth/refresh", post(refresh_token))
         .route("/api/v1/auth/logout", post(logout))
+        .route("/api/v1/auth/verify-email", get(verify_email))
+        .route(
+            "/api/v1/auth/resend-verification",
+            post(resend_verification),
+        )
         .with_state((user_use_case, auth_use_case, role_repository))
 }
 
@@ -163,6 +173,73 @@ async fn logout(
         Err(e) => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "LOGOUT_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+async fn verify_email(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let token = match params.get("token") {
+        Some(t) => t.to_string(),
+        None => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "MISSING_TOKEN",
+                "Verification token is required",
+                None,
+            );
+        }
+    };
+
+    match auth_use_case.verify_email(token).await {
+        Ok(_) => success_response(
+            "EMAIL_VERIFIED",
+            "Email verified successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::BAD_REQUEST,
+            "VERIFICATION_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResendVerificationRequest {
+    email_or_username: String,
+}
+
+async fn resend_verification(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Json(request): Json<ResendVerificationRequest>,
+) -> impl IntoResponse {
+    match auth_use_case
+        .resend_verification_email(request.email_or_username)
+        .await
+    {
+        Ok(_) => success_response(
+            "VERIFICATION_SENT",
+            "Verification email resent successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::BAD_REQUEST,
+            "RESEND_FAILED",
             &e.to_string(),
             None,
         ),

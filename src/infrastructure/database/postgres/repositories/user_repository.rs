@@ -165,8 +165,16 @@ impl UserRepository for UserPostgres {
         display_name_opt: Option<String>,
         avatar_image_url_opt: Option<String>,
     ) -> Result<()> {
-        self.admin_update(user_id, display_name_opt, avatar_image_url_opt, None, None)
-            .await
+        self.admin_update(
+            user_id,
+            display_name_opt,
+            avatar_image_url_opt,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
     }
 
     async fn admin_update(
@@ -176,6 +184,8 @@ impl UserRepository for UserPostgres {
         avatar_image_url_opt: Option<String>,
         is_active_opt: Option<bool>,
         is_verified_opt: Option<bool>,
+        verification_token_opt: Option<Option<String>>,
+        verification_token_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
     ) -> Result<()> {
         use crate::infrastructure::database::postgres::schema::users::dsl::*;
 
@@ -206,6 +216,18 @@ impl UserRepository for UserPostgres {
                 if let Some(verified) = is_verified_opt {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(is_verified.eq(Some(verified)))
+                        .execute(conn)?;
+                }
+
+                if let Some(token) = verification_token_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(verification_token.eq(token))
+                        .execute(conn)?;
+                }
+
+                if let Some(expires) = verification_token_expires_at_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(verification_token_expires_at.eq(expires))
                         .execute(conn)?;
                 }
 
@@ -249,6 +271,31 @@ impl UserRepository for UserPostgres {
     async fn delete(&self, id: Uuid) -> Result<()> {
         let mut conn = Arc::clone(&self.db_pool).get()?;
         diesel::delete(users::table.filter(users::id.eq(id))).execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn find_by_verification_token(&self, token: String) -> Result<Option<UserEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::verification_token.eq(token))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)
+            .optional()?;
+
+        Ok(result)
+    }
+
+    async fn mark_as_verified(&self, user_id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(user_id)))
+            .set((
+                users::is_verified.eq(true),
+                users::verification_token.eq::<Option<String>>(None),
+                users::verification_token_expires_at
+                    .eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
+            ))
+            .execute(&mut conn)?;
 
         Ok(())
     }

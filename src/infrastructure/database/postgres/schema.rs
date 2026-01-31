@@ -70,6 +70,9 @@ diesel::table! {
         last_login_at -> Nullable<Timestamptz>,
         failed_login_attempts -> Int4,
         locked_at -> Nullable<Timestamptz>,
+        #[max_length = 255]
+        verification_token -> Nullable<Varchar>,
+        verification_token_expires_at -> Nullable<Timestamptz>,
     }
 }
 

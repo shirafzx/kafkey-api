@@ -69,14 +69,12 @@ For list endpoints, the `data` field contains:
 ```json
 {
   "items": [...],
-  "pagination": {
-    "page": 1,
-    "pageSize": 20,
-    "totalItems": 120,
-    "totalPages": 6,
-    "hasNext": true,
-    "hasPrev": false
-  }
+  "page": 1,
+  "pageSize": 20,
+  "totalItems": 120,
+  "totalPages": 6,
+  "hasNext": true,
+  "hasPrev": false
 }
 ```
 
@@ -134,6 +132,30 @@ Refresh an expired access token.
 ```json
 {
   "refreshToken": "jwt-token"
+}
+```
+
+---
+
+#### GET /auth/verify-email
+
+Verify a user's email address using a token.
+
+**Query Params:**
+
+- `token`: The verification token sent via email.
+
+---
+
+#### POST /auth/resend-verification
+
+Resend the verification email to a user.
+
+**Request Body:**
+
+```json
+{
+  "emailOrUsername": "john@example.com"
 }
 ```
 

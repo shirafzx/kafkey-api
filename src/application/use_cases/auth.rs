@@ -54,6 +54,10 @@ where
         // Hash password
         let password_hash = PasswordService::hash_password(&password)?;
 
+        // Generate verification token (32 character hex)
+        let verification_token = Some(Uuid::new_v4().to_string().replace("-", ""));
+        let verification_token_expires_at = Some(chrono::Utc::now() + chrono::Duration::hours(24));
+
         // Create user entity
         let new_user = crate::domain::entities::user::NewUserEntity {
             username,
@@ -61,6 +65,8 @@ where
             display_name,
             avatar_image_url,
             password_hash,
+            verification_token,
+            verification_token_expires_at,
         };
 
         // Create user
@@ -77,6 +83,67 @@ where
         }
 
         Ok(user_id)
+    }
+
+    /// Verify user email using a token
+    pub async fn verify_email(&self, token: String) -> Result<()> {
+        let user = self
+            .user_repository
+            .find_by_verification_token(token)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Invalid or expired verification token"))?;
+
+        // Check expiration
+        if let Some(expires_at) = user.verification_token_expires_at {
+            if chrono::Utc::now() > expires_at {
+                return Err(anyhow::anyhow!("Verification token has expired"));
+            }
+        }
+
+        // Mark as verified
+        self.user_repository.mark_as_verified(user.id).await?;
+
+        Ok(())
+    }
+
+    /// Resend verification email
+    pub async fn resend_verification_email(&self, email_or_username: String) -> Result<()> {
+        // Find user
+        let user = match self
+            .user_repository
+            .find_by_email(email_or_username.clone())
+            .await
+        {
+            Ok(user) => user,
+            Err(_) => {
+                self.user_repository
+                    .find_by_username(email_or_username)
+                    .await?
+            }
+        };
+
+        if user.is_verified.unwrap_or(false) {
+            return Err(anyhow::anyhow!("Email is already verified"));
+        }
+
+        // Generate new token
+        let verification_token = Uuid::new_v4().to_string().replace("-", "");
+        let verification_token_expires_at = chrono::Utc::now() + chrono::Duration::hours(24);
+
+        // Update user
+        self.user_repository
+            .admin_update(
+                user.id,
+                None,
+                None,
+                None,
+                None,
+                Some(Some(verification_token)),
+                Some(Some(verification_token_expires_at)),
+            )
+            .await?;
+
+        Ok(())
     }
 
     /// Authenticate user and generate tokens

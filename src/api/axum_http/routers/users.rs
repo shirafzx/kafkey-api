@@ -248,6 +248,8 @@ async fn admin_update_user(
             request.avatar_image_url,
             request.is_active,
             request.is_verified,
+            None,
+            None,
         )
         .await
     {

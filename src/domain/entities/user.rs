@@ -21,6 +21,8 @@ pub struct UserEntity {
     pub last_login_at: Option<DateTime<Utc>>,
     pub failed_login_attempts: i32,
     pub locked_at: Option<DateTime<Utc>>,
+    pub verification_token: Option<String>,
+    pub verification_token_expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -31,4 +33,6 @@ pub struct NewUserEntity {
     pub avatar_image_url: Option<String>,
     pub password_hash: String,
     pub email: String,
+    pub verification_token: Option<String>,
+    pub verification_token_expires_at: Option<DateTime<Utc>>,
 }

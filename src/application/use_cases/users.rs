@@ -141,6 +141,8 @@ where
         avatar_image_url: Option<String>,
         is_active: Option<bool>,
         is_verified: Option<bool>,
+        verification_token: Option<Option<String>>,
+        verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
     ) -> Result<()> {
         self.user_repository
             .admin_update(
@@ -149,6 +151,8 @@ where
                 avatar_image_url,
                 is_active,
                 is_verified,
+                verification_token,
+                verification_token_expires_at,
             )
             .await
     }
