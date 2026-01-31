@@ -19,8 +19,8 @@ use crate::{
     infrastructure::database::postgres::{
         postgres_connection::PgPoolSquad,
         repositories::{
-            blacklist_repository::BlacklistPostgres, role_repository::RolePostgres,
-            user_repository::UserPostgres,
+            blacklist_repository::BlacklistPostgres, cached_user_repository::CachedUserRepository,
+            role_repository::RolePostgres, user_repository::UserPostgres,
         },
     },
     services::jwt_service::JwtService,
@@ -29,7 +29,8 @@ use crate::{
 use crate::api::axum_http::response_utils::{error_response, success_response};
 
 pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router {
-    let user_repository = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
+    let pg_user_repo = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
+    let user_repository = Arc::new(CachedUserRepository::new(pg_user_repo));
     let role_repository = Arc::new(RolePostgres::new(Arc::clone(&db_pool)));
 
     let blacklist_repository = Arc::new(BlacklistPostgres::new(Arc::clone(&db_pool)));
@@ -64,8 +65,8 @@ pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router
 
 async fn register(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     ValidatedJson(request): ValidatedJson<RegisterRequest>,
@@ -96,8 +97,8 @@ async fn register(
 
 async fn login(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     ValidatedJson(request): ValidatedJson<LoginRequest>,
@@ -118,8 +119,8 @@ async fn login(
 
 async fn refresh_token(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Json(request): Json<RefreshTokenRequest>,
@@ -141,8 +142,8 @@ async fn refresh_token(
 
 async fn logout(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     headers: axum::http::HeaderMap,
@@ -186,8 +187,8 @@ async fn logout(
 
 async fn verify_email(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
@@ -227,8 +228,8 @@ struct ResendVerificationRequest {
 
 async fn resend_verification(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Json(request): Json<ResendVerificationRequest>,
@@ -259,8 +260,8 @@ struct ForgotPasswordRequest {
 
 async fn forgot_password(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Json(request): Json<ForgotPasswordRequest>,
@@ -291,8 +292,8 @@ struct ResetPasswordRequest {
 
 async fn reset_password(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Json(request): Json<ResetPasswordRequest>,
@@ -317,8 +318,8 @@ async fn reset_password(
 
 async fn setup_2fa(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
@@ -355,8 +356,8 @@ async fn setup_2fa(
 
 async fn confirm_2fa(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
@@ -394,8 +395,8 @@ async fn confirm_2fa(
 
 async fn verify_2fa(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Json(request): Json<VerifyMfaRequest>,
@@ -433,8 +434,8 @@ async fn verify_2fa(
 
 async fn disable_2fa(
     axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<UserPostgres>>,
-        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<UserUseCases<CachedUserRepository<UserPostgres>>>,
+        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
     Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,

@@ -20,6 +20,12 @@ A high-performance, secure Rust-based REST API for Identity and Access Managemen
   - **Request Tracking**: Automated `x-request-id` headers for distributed tracing.
   - **Pagination**: Efficient list processing with `hasNext`/`hasPrev` indicators.
 
+### ⚡ Performance & Optimization
+
+- **Database Connection Pooling**: Configurable `r2d2` pool with dynamic `max_connections` and `min_idle` settings.
+- **In-Memory Caching**: Implements `moka` cache (Decorator Pattern) for high-frequency permission checks.
+- **Query Optimization**: Strategic indexes on frequent lookup columns (`verification_token`, `expires_at`, etc.).
+
 ## 🛠️ Tech Stack
 
 - **Framework**: [Axum](https://github.com/tokio-rs/axum)

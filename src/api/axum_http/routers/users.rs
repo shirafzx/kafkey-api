@@ -19,13 +19,17 @@ use crate::{
     },
     application::use_cases::users::UserUseCases,
     infrastructure::database::postgres::{
-        postgres_connection::PgPoolSquad, repositories::user_repository::UserPostgres,
+        postgres_connection::PgPoolSquad,
+        repositories::{
+            cached_user_repository::CachedUserRepository, user_repository::UserPostgres,
+        },
     },
     services::jwt_service::TokenClaims,
 };
 
 pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
-    let user_repository = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
+    let pg_user_repo = Arc::new(UserPostgres::new(Arc::clone(&db_pool)));
+    let user_repository = Arc::new(CachedUserRepository::new(pg_user_repo));
     let user_use_case = Arc::new(UserUseCases::new(user_repository));
 
     Router::new()
@@ -88,7 +92,7 @@ pub fn routes(db_pool: Arc<PgPoolSquad>) -> Router {
 
 async fn get_current_user(
     Extension(claims): Extension<TokenClaims>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
@@ -127,7 +131,7 @@ async fn get_current_user(
 
 async fn update_current_user(
     Extension(claims): Extension<TokenClaims>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
     ValidatedJson(request): ValidatedJson<UpdateProfileRequest>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&claims.sub) {
@@ -161,7 +165,7 @@ async fn update_current_user(
 }
 async fn list_users(
     Query(params): Query<PaginationParams>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     let page = params.page.unwrap_or(1);
     let page_size = params.page_size.unwrap_or(20);
@@ -212,7 +216,7 @@ async fn list_users(
 
 async fn get_user_by_id(
     Path(id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_by_id(id).await {
         Ok(u) => success_response(
@@ -239,7 +243,7 @@ async fn get_user_by_id(
 
 async fn admin_update_user(
     Path(id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
     ValidatedJson(request): ValidatedJson<AdminUpdateUserRequest>,
 ) -> impl IntoResponse {
     match user_use_case
@@ -275,7 +279,7 @@ async fn admin_update_user(
 
 async fn delete_user(
     Path(id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     match user_use_case.delete_user(id).await {
         Ok(_) => success_response(
@@ -300,7 +304,7 @@ struct AssignRoleRequest {
 
 async fn assign_role(
     Path(user_id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
     Json(request): Json<AssignRoleRequest>,
 ) -> impl IntoResponse {
     match user_use_case
@@ -323,7 +327,7 @@ async fn assign_role(
 
 async fn remove_role(
     Path((user_id, role_id)): Path<(Uuid, Uuid)>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     match user_use_case.remove_role(user_id, role_id).await {
         Ok(_) => success_response(
@@ -342,7 +346,7 @@ async fn remove_role(
 
 async fn get_user_roles(
     Path(user_id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_roles(user_id).await {
         Ok(roles) => {
@@ -371,7 +375,7 @@ async fn get_user_roles(
 
 async fn get_user_permissions(
     Path(user_id): Path<Uuid>,
-    State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
+    State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
     match user_use_case.get_user_permissions(user_id).await {
         Ok(perms) => {

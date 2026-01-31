@@ -28,6 +28,8 @@ async fn main() -> anyhow::Result<()> {
     // Get database connection pool
     let db_pool = Arc::new(postgres_connection::establish_connection(
         &config.database.url,
+        config.database.max_connections,
+        config.database.min_idle,
     )?);
 
     // Start the server

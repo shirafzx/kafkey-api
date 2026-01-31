@@ -89,8 +89,8 @@
 ### Performance & Optimization
 
 - [x] Add database query optimization and indexes
-- [ ] Implement caching for frequently accessed data (roles, permissions)
-- [ ] Add database connection pool tuning
+- [x] Implement caching for frequently accessed data (roles, permissions)
+- [x] Add database connection pool tuning
 - [x] Implement pagination for list endpoints (Users)
 - [ ] Add query result limits
 

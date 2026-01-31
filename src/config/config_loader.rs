@@ -24,6 +24,13 @@ pub fn load() -> Result<DotEnvyConfig> {
 
     let database = Database {
         url: std::env::var("DATABASE_URL").expect("DATABASE_URL is invalid"),
+        max_connections: std::env::var("DATABASE_MAX_CONNECTIONS")
+            .unwrap_or("10".to_string())
+            .parse()?,
+        min_idle: std::env::var("DATABASE_MIN_IDLE")
+            .ok()
+            .map(|v| v.parse())
+            .transpose()?,
     };
 
     Ok(DotEnvyConfig { server, database })
