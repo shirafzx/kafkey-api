@@ -47,12 +47,16 @@ All responses follow a standardized envelope structure.
 ```json
 {
   "success": false,
-  "code": "ERROR_CODE",
-  "message": "Human readable error message",
+  "code": "VALIDATION_ERROR",
+  "message": "Input validation failed",
   "errors": [
     {
-      "field": "fieldName",
-      "reason": "Why the field failed validation"
+      "field": "email",
+      "reason": "must be a valid email"
+    },
+    {
+      "field": "password",
+      "reason": "must be at least 8 characters"
     }
   ],
   "meta": {

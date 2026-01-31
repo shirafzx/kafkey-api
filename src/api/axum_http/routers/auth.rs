@@ -7,8 +7,10 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use axum_extra::extract::cookie::{Cookie, CookieJar};
 
 use crate::{
+    api::axum_http::extractors::ValidatedJson,
     application::dtos::{
         AuthResponse, ConfirmMfaRequest, Disable2faRequest, LoginRequest, RefreshTokenRequest,
         RegisterRequest, TotpSetupResponse, VerifyMfaRequest,
@@ -43,6 +45,7 @@ pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router
     Router::new()
         .route("/api/v1/auth/sign-up", post(register))
         .route("/api/v1/auth/login", post(login))
+        .route("/api/v1/auth/csrf-token", get(get_csrf_token))
         .route("/api/v1/auth/refresh", post(refresh_token))
         .route("/api/v1/auth/logout", post(logout))
         .route("/api/v1/auth/verify-email", get(verify_email))
@@ -65,7 +68,7 @@ async fn register(
         Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
-    Json(request): Json<RegisterRequest>,
+    ValidatedJson(request): ValidatedJson<RegisterRequest>,
 ) -> impl IntoResponse {
     match auth_use_case
         .register(
@@ -97,7 +100,7 @@ async fn login(
         Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
         Arc<RolePostgres>,
     )>,
-    Json(request): Json<LoginRequest>,
+    ValidatedJson(request): ValidatedJson<LoginRequest>,
 ) -> impl IntoResponse {
     match auth_use_case
         .login(request.email_or_username, request.password)
@@ -462,4 +465,23 @@ async fn disable_2fa(
             None,
         ),
     }
+}
+
+async fn get_csrf_token(jar: CookieJar) -> impl IntoResponse {
+    let token = Uuid::new_v4().to_string();
+
+    let cookie = Cookie::build(("csrf_token", token.clone()))
+        .path("/")
+        .http_only(false) // Must be readable by client for Double Submit
+        .secure(false) // Set to true in production if HTTPS
+        .same_site(axum_extra::extract::cookie::SameSite::Lax);
+
+    (
+        jar.add(cookie),
+        success_response(
+            "CSRF_TOKEN_GENERATED",
+            "CSRF token generated",
+            serde_json::json!({ "token": token }),
+        ),
+    )
 }

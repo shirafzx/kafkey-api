@@ -10,6 +10,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
+    api::axum_http::extractors::ValidatedJson,
     api::axum_http::middleware::{require_permission, require_role},
     api::axum_http::response_utils::{error_response, success_response},
     application::dtos::{
@@ -127,7 +128,7 @@ async fn get_current_user(
 async fn update_current_user(
     Extension(claims): Extension<TokenClaims>,
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
-    Json(request): Json<UpdateProfileRequest>,
+    ValidatedJson(request): ValidatedJson<UpdateProfileRequest>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
@@ -239,7 +240,7 @@ async fn get_user_by_id(
 async fn admin_update_user(
     Path(id): Path<Uuid>,
     State(user_use_case): State<Arc<UserUseCases<UserPostgres>>>,
-    Json(request): Json<AdminUpdateUserRequest>,
+    ValidatedJson(request): ValidatedJson<AdminUpdateUserRequest>,
 ) -> impl IntoResponse {
     match user_use_case
         .admin_update_user(

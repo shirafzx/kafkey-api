@@ -6,11 +6,12 @@ A high-performance, secure Rust-based REST API for Identity and Access Managemen
 
 - 🔐 **Authentication**: Secure JWT-based auth with Access and Refresh tokens.
 - 🛡️ **PBAC (Permission-Based Access Control)**: Granular permissions system for secure resource management.
-- 🔒 **Security First**:
-  - **Password Hashing**: Industry-standard Argon2 algorithm.
-  - **Account Lockout**: Automated protection against brute-force attacks.
-  - **Token Blacklisting**: Real-time token revocation for secure logout.
-  - **Global Rate Limiting**: Built-in protection against DDoS and abuse.
+- 🛡️ **Advanced Security**
+  - **CSRF Protection**: Double Submit Cookie pattern.
+  - **Request Validation**: Automated payload validation (e.g., email format, password strength).
+  - **Account Lockout**: Brute-force protection.
+  - **Token Blacklisting**: Revocation for secure logout.
+  - **Global Rate Limiting**: DDoS protection.
 - 📋 **API Excellence**:
   - **Standardized Responses**: Consistent envelope structure for success and errors.
   - **camelCase Support**: Seamless integration with modern frontend frameworks.
