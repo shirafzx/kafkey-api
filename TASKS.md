@@ -120,11 +120,12 @@
 
 ## 🚧 In Progress / TODO
 
-### Continuous Integration & Deployment
+### Phase 14: Continuous Integration & Deployment
 
-- [ ] Set up CI/CD pipeline (GitHub Actions/GitLab CI)
-- [ ] Add production-grade environment configuration
-- [ ] Implement health check monitoring for all containers
+- [x] Create GitHub Actions CI workflow for automated validation
+- [x] Implement `cargo fmt`, `clippy`, and `cargo test` in CI pipeline
+- [x] Implement Docker image build check in CI using Buildx
+- [x] Optimize CI performance with `rust-cache` and Docker layer caching
 
 ---
 
