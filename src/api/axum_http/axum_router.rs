@@ -57,6 +57,7 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
             Arc::clone(&db_pool),
             Arc::clone(&jwt_service),
         ))
+        .merge(routers::csrf::routes())
         .merge(
             routers::users::routes(Arc::clone(&db_pool))
                 .merge(routers::roles::routes(Arc::clone(&db_pool)))
@@ -71,6 +72,7 @@ pub async fn start(config: Arc<DotEnvyConfig>, db_pool: Arc<PgPoolSquad>) {
                 })),
         )
         .route("/health-check", get(default_routers::health_check))
+        .layer(axum::middleware::from_fn(middleware::csrf_middleware))
         .layer(axum::middleware::from_fn(move |req, next| {
             let state = Arc::clone(&rate_limit_state);
             async move {

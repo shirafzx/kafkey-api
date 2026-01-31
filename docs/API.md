@@ -16,10 +16,11 @@ All JSON request and response keys use **camelCase**.
 
 ### Request Headers
 
-| Header          | Description                                                 |
-| --------------- | ----------------------------------------------------------- |
-| `Authorization` | `Bearer <access_token>` (required for protected routes)     |
-| `x-request-id`  | Unique ID for tracking requests (provided in all responses) |
+| Header          | Description                                                                        |
+| --------------- | ---------------------------------------------------------------------------------- |
+| `Authorization` | `Bearer <access_token>` (required for protected routes)                            |
+| `X-CSRF-Token`  | CSRF token matching the `csrf_token` cookie (required for state-changing requests) |
+| `x-request-id`  | Unique ID for tracking requests (provided in all responses)                        |
 
 ## Response Format
 
@@ -83,6 +84,20 @@ For list endpoints, the `data` field contains:
 ## Endpoints
 
 ### Authentication
+
+#### GET /auth/csrf-token
+
+Returns a new CSRF token and sets the `csrf_token` cookie.
+
+**Response Data:**
+
+```json
+{
+  "token": "uuid-v4-token"
+}
+```
+
+---
 
 #### POST /auth/sign-up
 
