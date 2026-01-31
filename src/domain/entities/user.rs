@@ -23,6 +23,8 @@ pub struct UserEntity {
     pub locked_at: Option<DateTime<Utc>>,
     pub verification_token: Option<String>,
     pub verification_token_expires_at: Option<DateTime<Utc>>,
+    pub password_reset_token: Option<String>,
+    pub password_reset_expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Insertable)]

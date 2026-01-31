@@ -140,6 +140,8 @@ where
                 None,
                 Some(Some(verification_token)),
                 Some(Some(verification_token_expires_at)),
+                None,
+                None,
             )
             .await?;
 
@@ -252,7 +254,6 @@ where
         Ok(())
     }
 
-    /// Refresh access token using refresh token
     pub async fn refresh_token(&self, refresh_token: String) -> Result<String> {
         // Validate refresh token
         let claims = self.jwt_service.validate_refresh_token(&refresh_token)?;
@@ -284,5 +285,60 @@ where
                 .generate_access_token(user_id, role_names, permission_names)?;
 
         Ok(access_token)
+    }
+
+    /// Initiate password reset
+    pub async fn forgot_password(&self, email: String) -> Result<()> {
+        let user = self.user_repository.find_by_email(email).await?;
+
+        // Generate reset token (32 character hex)
+        let token = Uuid::new_v4().to_string().replace("-", "");
+        let expires_at = chrono::Utc::now() + chrono::Duration::hours(1);
+
+        // Store token
+        self.user_repository
+            .admin_update(
+                user.id,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(Some(token)),
+                Some(Some(expires_at)),
+            )
+            .await?;
+
+        // In a real app, send email here
+        tracing::info!("Password reset token for user {}: {}", user.id, "...");
+
+        Ok(())
+    }
+
+    /// Reset password using token
+    pub async fn reset_password(&self, token: String, new_password: String) -> Result<()> {
+        let user = self
+            .user_repository
+            .find_by_password_reset_token(token)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Invalid or expired reset token"))?;
+
+        // Check expiration
+        if let Some(expires_at) = user.password_reset_expires_at {
+            if chrono::Utc::now() > expires_at {
+                return Err(anyhow::anyhow!("Reset token has expired"));
+            }
+        }
+
+        // Hash new password
+        let password_hash = PasswordService::hash_password(&new_password)?;
+
+        // Update password (methods clear token)
+        self.user_repository
+            .update_password(user.id, password_hash)
+            .await?;
+
+        Ok(())
     }
 }

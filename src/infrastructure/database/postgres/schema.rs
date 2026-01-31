@@ -73,6 +73,9 @@ diesel::table! {
         #[max_length = 255]
         verification_token -> Nullable<Varchar>,
         verification_token_expires_at -> Nullable<Timestamptz>,
+        #[max_length = 255]
+        password_reset_token -> Nullable<Varchar>,
+        password_reset_expires_at -> Nullable<Timestamptz>,
     }
 }
 

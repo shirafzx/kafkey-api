@@ -161,6 +161,35 @@ Resend the verification email to a user.
 
 ---
 
+#### POST /auth/forgot-password
+
+Request a password reset. A reset token will be generated (and in a real app, emailed) to the user.
+
+**Request Body:**
+
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+---
+
+#### POST /auth/reset-password
+
+Reset a user's password using a valid reset token.
+
+**Request Body:**
+
+```json
+{
+  "token": "reset-token-hex",
+  "newPassword": "NewSecurePass123!"
+}
+```
+
+---
+
 ### User Management
 
 #### GET /users/me

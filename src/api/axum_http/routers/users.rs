@@ -250,6 +250,8 @@ async fn admin_update_user(
             request.is_verified,
             None,
             None,
+            None,
+            None,
         )
         .await
     {

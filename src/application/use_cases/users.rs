@@ -143,6 +143,8 @@ where
         is_verified: Option<bool>,
         verification_token: Option<Option<String>>,
         verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        password_reset_token: Option<Option<String>>,
+        password_reset_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
     ) -> Result<()> {
         self.user_repository
             .admin_update(
@@ -153,6 +155,8 @@ where
                 is_verified,
                 verification_token,
                 verification_token_expires_at,
+                password_reset_token,
+                password_reset_expires_at,
             )
             .await
     }

@@ -46,6 +46,8 @@ pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router
             "/api/v1/auth/resend-verification",
             post(resend_verification),
         )
+        .route("/api/v1/auth/forgot-password", post(forgot_password))
+        .route("/api/v1/auth/reset-password", post(reset_password))
         .with_state((user_use_case, auth_use_case, role_repository))
 }
 
@@ -240,6 +242,70 @@ async fn resend_verification(
         Err(e) => error_response(
             StatusCode::BAD_REQUEST,
             "RESEND_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ForgotPasswordRequest {
+    email: String,
+}
+
+async fn forgot_password(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Json(request): Json<ForgotPasswordRequest>,
+) -> impl IntoResponse {
+    match auth_use_case.forgot_password(request.email).await {
+        Ok(_) => success_response(
+            "FORGOT_PASSWORD_SENT",
+            "If the email exists, a reset link will be sent",
+            serde_json::json!({}),
+        ),
+        Err(_) => {
+            // Standard security practice: Don't reveal if email exists
+            success_response(
+                "FORGOT_PASSWORD_SENT",
+                "If the email exists, a reset link will be sent",
+                serde_json::json!({}),
+            )
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResetPasswordRequest {
+    token: String,
+    new_password: String,
+}
+
+async fn reset_password(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Json(request): Json<ResetPasswordRequest>,
+) -> impl IntoResponse {
+    match auth_use_case
+        .reset_password(request.token, request.new_password)
+        .await
+    {
+        Ok(_) => success_response(
+            "PASSWORD_RESET_SUCCESS",
+            "Password has been reset successfully",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::BAD_REQUEST,
+            "PASSWORD_RESET_FAILED",
             &e.to_string(),
             None,
         ),

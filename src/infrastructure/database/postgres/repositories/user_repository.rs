@@ -173,6 +173,8 @@ impl UserRepository for UserPostgres {
             None,
             None,
             None,
+            None,
+            None,
         )
         .await
     }
@@ -186,6 +188,8 @@ impl UserRepository for UserPostgres {
         is_verified_opt: Option<bool>,
         verification_token_opt: Option<Option<String>>,
         verification_token_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        password_reset_token_opt: Option<Option<String>>,
+        password_reset_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
     ) -> Result<()> {
         use crate::infrastructure::database::postgres::schema::users::dsl::*;
 
@@ -228,6 +232,18 @@ impl UserRepository for UserPostgres {
                 if let Some(expires) = verification_token_expires_at_opt {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(verification_token_expires_at.eq(expires))
+                        .execute(conn)?;
+                }
+
+                if let Some(token) = password_reset_token_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(password_reset_token.eq(token))
+                        .execute(conn)?;
+                }
+
+                if let Some(expires) = password_reset_expires_at_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(password_reset_expires_at.eq(expires))
                         .execute(conn)?;
                 }
 
@@ -294,6 +310,30 @@ impl UserRepository for UserPostgres {
                 users::verification_token.eq::<Option<String>>(None),
                 users::verification_token_expires_at
                     .eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
+            ))
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn find_by_password_reset_token(&self, token: String) -> Result<Option<UserEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::password_reset_token.eq(token))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)
+            .optional()?;
+
+        Ok(result)
+    }
+
+    async fn update_password(&self, user_id: Uuid, new_password_hash: String) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(user_id)))
+            .set((
+                users::password_hash.eq(new_password_hash),
+                users::password_reset_token.eq::<Option<String>>(None),
+                users::password_reset_expires_at.eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
             ))
             .execute(&mut conn)?;
 

@@ -79,7 +79,7 @@
 - [x] Implement token blacklist for logout functionality
 - [x] Add account lockout after failed login attempts
 - [x] Implement email verification flow
-- [ ] Add password reset functionality
+- [x] Add password reset functionality
 - [ ] Add two-factor authentication (2FA) support
 - [ ] Implement CSRF protection
 - [ ] Add request validation middleware
