@@ -145,6 +145,9 @@ where
         verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
         password_reset_token: Option<Option<String>>,
         password_reset_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        two_factor_secret: Option<Option<String>>,
+        two_factor_enabled: Option<bool>,
+        two_factor_backup_codes: Option<Option<Vec<Option<String>>>>,
     ) -> Result<()> {
         self.user_repository
             .admin_update(
@@ -157,6 +160,9 @@ where
                 verification_token_expires_at,
                 password_reset_token,
                 password_reset_expires_at,
+                two_factor_secret,
+                two_factor_enabled,
+                two_factor_backup_codes,
             )
             .await
     }

@@ -1,14 +1,18 @@
 use std::sync::Arc;
+use uuid::Uuid;
 
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
 };
 
 use crate::{
-    application::dtos::{AuthResponse, LoginRequest, RefreshTokenRequest, RegisterRequest},
+    application::dtos::{
+        AuthResponse, ConfirmMfaRequest, Disable2faRequest, LoginRequest, RefreshTokenRequest,
+        RegisterRequest, TotpSetupResponse, VerifyMfaRequest,
+    },
     application::use_cases::{auth::AuthUseCases, users::UserUseCases},
     infrastructure::database::postgres::{
         postgres_connection::PgPoolSquad,
@@ -48,6 +52,10 @@ pub fn routes(db_pool: Arc<PgPoolSquad>, jwt_service: Arc<JwtService>) -> Router
         )
         .route("/api/v1/auth/forgot-password", post(forgot_password))
         .route("/api/v1/auth/reset-password", post(reset_password))
+        .route("/api/v1/auth/2fa/setup", post(setup_2fa))
+        .route("/api/v1/auth/2fa/confirm", post(confirm_2fa))
+        .route("/api/v1/auth/2fa/verify", post(verify_2fa))
+        .route("/api/v1/auth/2fa/disable", post(disable_2fa))
         .with_state((user_use_case, auth_use_case, role_repository))
 }
 
@@ -95,15 +103,7 @@ async fn login(
         .login(request.email_or_username, request.password)
         .await
     {
-        Ok((user_id, access_token, refresh_token)) => success_response(
-            "AUTH_SUCCESS",
-            "Login successful",
-            AuthResponse {
-                user_id: user_id.to_string(),
-                access_token,
-                refresh_token,
-            },
-        ),
+        Ok(login_response) => success_response("AUTH_SUCCESS", "Login processed", login_response),
         Err(e) => error_response(
             StatusCode::UNAUTHORIZED,
             "AUTH_FAILED",
@@ -306,6 +306,158 @@ async fn reset_password(
         Err(e) => error_response(
             StatusCode::BAD_REQUEST,
             "PASSWORD_RESET_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+async fn setup_2fa(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
+) -> impl IntoResponse {
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_USER_ID",
+                "Invalid user ID in token",
+                None,
+            );
+        }
+    };
+
+    match auth_use_case.generate_2fa_setup(user_id).await {
+        Ok((secret, qr_code_url)) => success_response(
+            "2FA_SETUP_GENERATED",
+            "2FA setup details generated",
+            TotpSetupResponse {
+                secret,
+                qr_code_url,
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::BAD_REQUEST,
+            "2FA_SETUP_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+async fn confirm_2fa(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
+    Json(request): Json<ConfirmMfaRequest>,
+) -> impl IntoResponse {
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_USER_ID",
+                "Invalid user ID in token",
+                None,
+            );
+        }
+    };
+
+    match auth_use_case
+        .confirm_2fa_setup(user_id, request.secret, request.code)
+        .await
+    {
+        Ok(backup_codes) => success_response(
+            "2FA_CONFIRMED",
+            "2FA has been enabled",
+            serde_json::json!({ "backupCodes": backup_codes }),
+        ),
+        Err(e) => error_response(
+            StatusCode::BAD_REQUEST,
+            "2FA_CONFIRM_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+async fn verify_2fa(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Json(request): Json<VerifyMfaRequest>,
+) -> impl IntoResponse {
+    let user_id = match Uuid::parse_str(&request.user_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_USER_ID",
+                "Invalid user ID",
+                None,
+            );
+        }
+    };
+
+    match auth_use_case.verify_2fa_login(user_id, request.code).await {
+        Ok((access_token, refresh_token)) => success_response(
+            "2FA_VERIFIED",
+            "2FA verification successful",
+            AuthResponse {
+                user_id: request.user_id,
+                access_token,
+                refresh_token,
+            },
+        ),
+        Err(e) => error_response(
+            StatusCode::UNAUTHORIZED,
+            "2FA_VERIFY_FAILED",
+            &e.to_string(),
+            None,
+        ),
+    }
+}
+
+async fn disable_2fa(
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
+        Arc<UserUseCases<UserPostgres>>,
+        Arc<AuthUseCases<UserPostgres, RolePostgres, BlacklistPostgres>>,
+        Arc<RolePostgres>,
+    )>,
+    Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
+    Json(request): Json<Disable2faRequest>,
+) -> impl IntoResponse {
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_USER_ID",
+                "Invalid user ID in token",
+                None,
+            );
+        }
+    };
+
+    match auth_use_case.disable_2fa(user_id, request.code).await {
+        Ok(_) => success_response(
+            "2FA_DISABLED",
+            "2FA has been disabled",
+            serde_json::json!({}),
+        ),
+        Err(e) => error_response(
+            StatusCode::BAD_REQUEST,
+            "2FA_DISABLE_FAILED",
             &e.to_string(),
             None,
         ),

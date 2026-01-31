@@ -76,6 +76,10 @@ diesel::table! {
         #[max_length = 255]
         password_reset_token -> Nullable<Varchar>,
         password_reset_expires_at -> Nullable<Timestamptz>,
+        #[max_length = 255]
+        two_factor_secret -> Nullable<Varchar>,
+        two_factor_enabled -> Bool,
+        two_factor_backup_codes -> Nullable<Array<Nullable<Text>>>,
     }
 }
 

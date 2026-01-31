@@ -25,6 +25,9 @@ pub struct UserEntity {
     pub verification_token_expires_at: Option<DateTime<Utc>>,
     pub password_reset_token: Option<String>,
     pub password_reset_expires_at: Option<DateTime<Utc>>,
+    pub two_factor_secret: Option<String>,
+    pub two_factor_enabled: bool,
+    pub two_factor_backup_codes: Option<Vec<Option<String>>>,
 }
 
 #[derive(Debug, Clone, Insertable)]

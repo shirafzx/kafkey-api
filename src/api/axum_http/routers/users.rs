@@ -252,6 +252,9 @@ async fn admin_update_user(
             None,
             None,
             None,
+            None,
+            None,
+            None,
         )
         .await
     {

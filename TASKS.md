@@ -80,7 +80,7 @@
 - [x] Add account lockout after failed login attempts
 - [x] Implement email verification flow
 - [x] Add password reset functionality
-- [ ] Add two-factor authentication (2FA) support
+- [/] Add two-factor authentication (2FA) support
 - [ ] Implement CSRF protection
 - [ ] Add request validation middleware
 

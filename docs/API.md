@@ -161,6 +161,77 @@ Resend the verification email to a user.
 
 ---
 
+#### POST /auth/2fa/setup (Protected)
+
+Begin 2FA setup. Returns a TOTP secret and a provisioning URL for QR codes.
+
+**Response Data:**
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qrCodeUrl": "otpauth://totp/KafkeyAPI:john@example.com?secret=JBSWY3DPEHPK3PXP&issuer=KafkeyAPI"
+}
+```
+
+#### POST /auth/2fa/confirm (Protected)
+
+Confirm 2FA setup by providing the first 6-digit code. Returns backup codes.
+
+**Request Body:**
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "code": "123456"
+}
+```
+
+**Response Data:**
+
+```json
+{
+  "backupCodes": ["ABCDEF12", "GHIJKL34", ...]
+}
+```
+
+#### POST /auth/2fa/verify
+
+Verify 2FA code during login if required.
+
+**Request Body:**
+
+```json
+{
+  "userId": "uuid",
+  "code": "123456"
+}
+```
+
+**Response Data:**
+
+```json
+{
+  "userId": "uuid",
+  "accessToken": "jwt-token",
+  "refreshToken": "jwt-token"
+}
+```
+
+#### POST /auth/2fa/disable (Protected)
+
+Disable 2FA for the authenticated user.
+
+**Request Body:**
+
+```json
+{
+  "code": "123456"
+}
+```
+
+---
+
 #### POST /auth/forgot-password
 
 Request a password reset. A reset token will be generated (and in a real app, emailed) to the user.

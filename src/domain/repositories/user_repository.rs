@@ -43,6 +43,9 @@ pub trait UserRepository {
         verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
         password_reset_token: Option<Option<String>>,
         password_reset_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        two_factor_secret: Option<Option<String>>,
+        two_factor_enabled: Option<bool>,
+        two_factor_backup_codes: Option<Option<Vec<Option<String>>>>,
     ) -> Result<()>;
 
     async fn find_all(&self) -> Result<Vec<UserEntity>>;
@@ -57,4 +60,13 @@ pub trait UserRepository {
     // Password Reset
     async fn find_by_password_reset_token(&self, token: String) -> Result<Option<UserEntity>>;
     async fn update_password(&self, id: Uuid, password_hash: String) -> Result<()>;
+
+    // 2FA
+    async fn update_2fa_status(
+        &self,
+        id: Uuid,
+        secret: Option<String>,
+        enabled: bool,
+        backup_codes: Vec<Option<String>>,
+    ) -> Result<()>;
 }

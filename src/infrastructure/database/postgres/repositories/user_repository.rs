@@ -175,6 +175,9 @@ impl UserRepository for UserPostgres {
             None,
             None,
             None,
+            None,
+            None,
+            None,
         )
         .await
     }
@@ -190,6 +193,9 @@ impl UserRepository for UserPostgres {
         verification_token_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
         password_reset_token_opt: Option<Option<String>>,
         password_reset_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        two_factor_secret_opt: Option<Option<String>>,
+        two_factor_enabled_opt: Option<bool>,
+        two_factor_backup_codes_opt: Option<Option<Vec<Option<String>>>>,
     ) -> Result<()> {
         use crate::infrastructure::database::postgres::schema::users::dsl::*;
 
@@ -244,6 +250,24 @@ impl UserRepository for UserPostgres {
                 if let Some(expires) = password_reset_expires_at_opt {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(password_reset_expires_at.eq(expires))
+                        .execute(conn)?;
+                }
+
+                if let Some(token) = two_factor_secret_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(two_factor_secret.eq(token))
+                        .execute(conn)?;
+                }
+
+                if let Some(enabled_val) = two_factor_enabled_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(two_factor_enabled.eq(enabled_val))
+                        .execute(conn)?;
+                }
+
+                if let Some(codes) = two_factor_backup_codes_opt {
+                    diesel::update(users.filter(id.eq(user_id)))
+                        .set(two_factor_backup_codes.eq(codes))
                         .execute(conn)?;
                 }
 
@@ -334,6 +358,25 @@ impl UserRepository for UserPostgres {
                 users::password_hash.eq(new_password_hash),
                 users::password_reset_token.eq::<Option<String>>(None),
                 users::password_reset_expires_at.eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
+            ))
+            .execute(&mut conn)?;
+
+        Ok(())
+    }
+
+    async fn update_2fa_status(
+        &self,
+        user_id: Uuid,
+        secret: Option<String>,
+        enabled_val: bool,
+        backup_codes_val: Vec<Option<String>>,
+    ) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        update(users::table.filter(users::id.eq(user_id)))
+            .set((
+                users::two_factor_secret.eq(secret),
+                users::two_factor_enabled.eq(enabled_val),
+                users::two_factor_backup_codes.eq(Some(backup_codes_val)),
             ))
             .execute(&mut conn)?;
 

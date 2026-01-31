@@ -30,3 +30,37 @@ pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum LoginResponse {
+    Success(AuthResponse),
+    RequiresMfa { user_id: String },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyMfaRequest {
+    pub user_id: String,
+    pub code: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TotpSetupResponse {
+    pub secret: String,
+    pub qr_code_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmMfaRequest {
+    pub secret: String,
+    pub code: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Disable2faRequest {
+    pub code: String,
+}

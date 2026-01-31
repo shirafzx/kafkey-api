@@ -3,6 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
+    application::dtos::LoginResponse,
     domain::repositories::{
         blacklist_repository::BlacklistRepository, role_repository::RoleRepository,
         user_repository::UserRepository,
@@ -142,6 +143,9 @@ where
                 Some(Some(verification_token_expires_at)),
                 None,
                 None,
+                None,
+                None,
+                None,
             )
             .await?;
 
@@ -153,7 +157,7 @@ where
         &self,
         email_or_username: String,
         password: String,
-    ) -> Result<(Uuid, String, String)> {
+    ) -> Result<LoginResponse> {
         const MAX_FAILED_ATTEMPTS: i32 = 5;
         const LOCKOUT_DURATION_MINUTES: i64 = 30;
 
@@ -221,12 +225,25 @@ where
         let role_names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
         let permission_names: Vec<String> = permissions.iter().map(|p| p.name.clone()).collect();
 
+        // Check if 2FA is enabled
+        if user.two_factor_enabled {
+            return Ok(LoginResponse::RequiresMfa {
+                user_id: user.id.to_string(),
+            });
+        }
+
         // Generate tokens
         let token_pair =
             self.jwt_service
                 .generate_token_pair(user.id, role_names, permission_names)?;
 
-        Ok((user.id, token_pair.access_token, token_pair.refresh_token))
+        Ok(LoginResponse::Success(
+            crate::application::dtos::AuthResponse {
+                user_id: user.id.to_string(),
+                access_token: token_pair.access_token,
+                refresh_token: token_pair.refresh_token,
+            },
+        ))
     }
 
     /// Logout user by blacklisting their tokens
@@ -307,6 +324,9 @@ where
                 None,
                 Some(Some(token)),
                 Some(Some(expires_at)),
+                None,
+                None,
+                None,
             )
             .await?;
 
@@ -340,5 +360,145 @@ where
             .await?;
 
         Ok(())
+    }
+
+    /// Generate 2FA setup details (secret and provisioning URL)
+    pub async fn generate_2fa_setup(&self, user_id: Uuid) -> Result<(String, String)> {
+        let user = self.user_repository.find_by_id(user_id).await?;
+
+        if user.two_factor_enabled {
+            return Err(anyhow::anyhow!("2FA is already enabled"));
+        }
+
+        let secret = crate::services::totp_service::TotpService::generate_secret();
+        let qr_url = crate::services::totp_service::TotpService::generate_qr_code_url(
+            &secret,
+            &user.email,
+            "KafkeyAPI", // Could be configurable
+        )?;
+
+        Ok((secret, qr_url))
+    }
+
+    /// Confirm 2FA setup and enable it
+    pub async fn confirm_2fa_setup(
+        &self,
+        user_id: Uuid,
+        secret: String,
+        code: String,
+    ) -> Result<Vec<String>> {
+        // Verify code
+        if !crate::services::totp_service::TotpService::verify_code(&secret, &code) {
+            return Err(anyhow::anyhow!("Invalid verification code"));
+        }
+
+        // Generate backup codes
+        let backup_codes = self.generate_backup_codes();
+        let backup_codes_opt: Vec<Option<String>> =
+            backup_codes.iter().map(|c| Some(c.clone())).collect();
+
+        // Update user status
+        self.user_repository
+            .update_2fa_status(user_id, Some(secret), true, backup_codes_opt)
+            .await?;
+
+        Ok(backup_codes)
+    }
+
+    /// Disable 2FA
+    pub async fn disable_2fa(&self, user_id: Uuid, code: String) -> Result<()> {
+        let user = self.user_repository.find_by_id(user_id).await?;
+
+        if !user.two_factor_enabled {
+            return Err(anyhow::anyhow!("2FA is not enabled"));
+        }
+
+        let secret = user
+            .two_factor_secret
+            .ok_or_else(|| anyhow::anyhow!("Missing 2FA secret"))?;
+
+        // Verify code
+        if !crate::services::totp_service::TotpService::verify_code(&secret, &code) {
+            return Err(anyhow::anyhow!("Invalid verification code"));
+        }
+
+        // Disable 2FA
+        self.user_repository
+            .update_2fa_status(user_id, None, false, vec![])
+            .await?;
+
+        Ok(())
+    }
+
+    /// Verify 2FA login code
+    pub async fn verify_2fa_login(&self, user_id: Uuid, code: String) -> Result<(String, String)> {
+        let user = self.user_repository.find_by_id(user_id).await?;
+
+        if !user.two_factor_enabled {
+            return Err(anyhow::anyhow!("2FA is not enabled for this user"));
+        }
+
+        let secret = user
+            .two_factor_secret
+            .ok_or_else(|| anyhow::anyhow!("Missing 2FA secret"))?;
+
+        // Verify code
+        let is_valid = crate::services::totp_service::TotpService::verify_code(&secret, &code);
+
+        // Check backup codes if TOTP fails
+        if !is_valid {
+            // Check backup codes
+            let backup_codes = user.two_factor_backup_codes.unwrap_or_default();
+            let mut found = false;
+            let mut new_codes = Vec::new();
+
+            for c_opt in backup_codes {
+                if let Some(c) = c_opt {
+                    if c == code && !found {
+                        found = true;
+                        continue; // Consume this code
+                    }
+                    new_codes.push(Some(c));
+                }
+            }
+
+            if !found {
+                return Err(anyhow::anyhow!("Invalid 2FA code"));
+            }
+
+            // Update user with consumed backup code
+            self.user_repository
+                .update_2fa_status(user.id, Some(secret), true, new_codes)
+                .await?;
+        }
+
+        // Get user roles and permissions
+        let roles = self.user_repository.get_user_roles(user.id).await?;
+        let permissions = self.user_repository.get_user_permissions(user.id).await?;
+
+        let role_names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
+        let permission_names: Vec<String> = permissions.iter().map(|p| p.name.clone()).collect();
+
+        // Generate tokens
+        let token_pair =
+            self.jwt_service
+                .generate_token_pair(user.id, role_names, permission_names)?;
+
+        Ok((token_pair.access_token, token_pair.refresh_token))
+    }
+
+    fn generate_backup_codes(&self) -> Vec<String> {
+        use rand::distributions::Alphanumeric;
+        use rand::{Rng, thread_rng};
+
+        (0..10)
+            .map(|_| {
+                thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(8)
+                    .map(char::from)
+                    .collect()
+            })
+            .collect()
     }
 }
