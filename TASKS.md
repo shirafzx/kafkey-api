@@ -46,7 +46,7 @@
 - [x] `POST /api/v1/auth/refresh` - Refresh access token
 - [x] `GET /api/v1/users/me` - Get current user profile
 - [x] `PUT /api/v1/users/me` - Update current user profile
-- [x] `GET /api/v1/users` - List all users (Paginated, requires `users.read`)
+- [x] `GET /api/v1/users` - List all users (Paginated, requires `admin` role and `users.read`)
 - [x] `GET /api/v1/users/:id` - Get user by ID (requires `users.read`)
 - [x] `PUT /api/v1/users/:id` - Update user (requires `users.update`)
 - [x] `DELETE /api/v1/users/:id` - Delete user (requires `users.delete`)
@@ -78,7 +78,7 @@
 - [x] Add global rate limiting for all endpoints
 - [x] Implement token blacklist for logout functionality
 - [x] Add account lockout after failed login attempts
-- [ ] Implement email verification flow
+- [x] Implement email verification flow
 - [ ] Add password reset functionality
 - [ ] Add two-factor authentication (2FA) support
 - [ ] Implement CSRF protection
