@@ -1,8 +1,26 @@
-use kafkey_api::presentation::axum_http::axum_router::start;
+use std::sync::Arc;
+
+use kafkey_api::{
+    api::axum_http::axum_router,
+    config::config_loader,
+    infrastructure::database::{mongodb::mongodb_connection, postgres::postgres_connection},
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
+    // Load configuration
+    let config = Arc::new(config_loader::load()?);
+
+    // Initialize Sentry
+    let _guard = sentry::init((
+        config.server.sentry_dsn.as_deref(),
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            ..Default::default()
+        },
+    ));
+
     // Enable tracing.
     tracing_subscriber::registry()
         .with(
@@ -15,7 +33,23 @@ async fn main() {
             }),
         )
         .with(tracing_subscriber::fmt::layer())
+        .with(sentry_tracing::layer())
         .init();
 
-    start().await;
+    // Get database connection pool
+    let db_pool = Arc::new(postgres_connection::establish_connection(
+        &config.database.url,
+        config.database.max_connections,
+        config.database.min_idle,
+    )?);
+
+    // Initialize MongoDB client
+    let mongodb_client = mongodb_connection::establish_connection(&config.database.mongodb_url)
+        .await
+        .expect("Failed to initialize MongoDB connection");
+
+    // Start the server
+    axum_router::start(config, db_pool, mongodb_client).await;
+
+    Ok(())
 }
