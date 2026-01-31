@@ -167,8 +167,7 @@ async fn list_users(
     Query(params): Query<PaginationParams>,
     State(user_use_case): State<Arc<UserUseCases<CachedUserRepository<UserPostgres>>>>,
 ) -> impl IntoResponse {
-    let page = params.page.unwrap_or(1);
-    let page_size = params.page_size.unwrap_or(20);
+    let (page, page_size) = params.normalize();
 
     match user_use_case.list_users_paginated(page, page_size).await {
         Ok((users, total)) => {

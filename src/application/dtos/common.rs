@@ -1,10 +1,25 @@
 use serde::{Deserialize, Serialize};
 
+pub const DEFAULT_PAGE_SIZE: i64 = 20;
+pub const MAX_PAGE_SIZE: i64 = 50;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaginationParams {
     pub page: Option<i64>,
     pub page_size: Option<i64>,
+}
+
+impl PaginationParams {
+    pub fn normalize(&self) -> (i64, i64) {
+        let page = self.page.unwrap_or(1).max(1);
+        let page_size = self
+            .page_size
+            .unwrap_or(DEFAULT_PAGE_SIZE)
+            .max(1)
+            .min(MAX_PAGE_SIZE);
+        (page, page_size)
+    }
 }
 
 #[derive(Debug, Serialize)]
