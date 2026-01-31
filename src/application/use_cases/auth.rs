@@ -61,8 +61,8 @@ where
 
         // Create user entity
         let new_user = crate::domain::entities::user::NewUserEntity {
-            username,
-            email,
+            username: username.clone(),
+            email: email.clone(),
             display_name,
             avatar_image_url,
             password_hash,
@@ -72,6 +72,14 @@ where
 
         // Create user
         let user_id = self.user_repository.create(new_user).await?;
+
+        tracing::info!(
+            event = "AUTH_REGISTER_SUCCESS",
+            user_id = %user_id,
+            username = %username,
+            email = %email,
+            "User registered successfully"
+        );
 
         // Assign default "user" role
         match self.role_repository.find_by_name("user".to_string()).await {
@@ -103,6 +111,12 @@ where
 
         // Mark as verified
         self.user_repository.mark_as_verified(user.id).await?;
+
+        tracing::info!(
+            event = "AUTH_EMAIL_VERIFIED",
+            user_id = %user.id,
+            "User email verified successfully"
+        );
 
         Ok(())
     }
@@ -170,7 +184,7 @@ where
             Ok(user) => user,
             Err(_) => {
                 self.user_repository
-                    .find_by_username(email_or_username)
+                    .find_by_username(email_or_username.clone())
                     .await?
             }
         };
@@ -181,9 +195,18 @@ where
             let lockout_duration = chrono::Duration::minutes(LOCKOUT_DURATION_MINUTES);
             if now < locked_at + lockout_duration {
                 let remaining = (locked_at + lockout_duration) - now;
+                let minutes = remaining.num_minutes() + 1;
+
+                tracing::warn!(
+                    event = "AUTH_LOGIN_LOCKED",
+                    user_id = %user.id,
+                    remaining_minutes = minutes,
+                    "Login attempted on locked account"
+                );
+
                 return Err(anyhow::anyhow!(
                     "Account is locked. Please try again in {} minutes.",
-                    remaining.num_minutes() + 1
+                    minutes
                 ));
             } else {
                 // Lockout expired, reset for this attempt
@@ -200,11 +223,26 @@ where
             // Check if we should lock now
             if user.failed_login_attempts + 1 >= MAX_FAILED_ATTEMPTS {
                 self.user_repository.lock_account(user.id).await?;
+
+                tracing::warn!(
+                    event = "AUTH_ACCOUNT_LOCKOUT",
+                    user_id = %user.id,
+                    email = %user.email,
+                    "Account locked due to multiple failed login attempts"
+                );
+
                 return Err(anyhow::anyhow!(
                     "Too many failed attempts. Account locked for {} minutes.",
                     LOCKOUT_DURATION_MINUTES
                 ));
             }
+
+            tracing::warn!(
+                event = "AUTH_LOGIN_FAILED",
+                email_or_username = %email_or_username,
+                reason = "Invalid credentials",
+                "Login failed"
+            );
 
             return Err(anyhow::anyhow!("Invalid credentials"));
         }
@@ -227,6 +265,12 @@ where
 
         // Check if 2FA is enabled
         if user.two_factor_enabled {
+            tracing::info!(
+                event = "AUTH_MFA_CHALLENGE",
+                user_id = %user.id,
+                "MFA challenge required for user login"
+            );
+
             return Ok(LoginResponse::RequiresMfa {
                 user_id: user.id.to_string(),
             });
@@ -237,13 +281,21 @@ where
             self.jwt_service
                 .generate_token_pair(user.id, role_names, permission_names)?;
 
-        Ok(LoginResponse::Success(
+        let res = Ok(LoginResponse::Success(
             crate::application::dtos::AuthResponse {
                 user_id: user.id.to_string(),
                 access_token: token_pair.access_token,
                 refresh_token: token_pair.refresh_token,
             },
-        ))
+        ));
+
+        tracing::info!(
+            event = "AUTH_LOGIN_SUCCESS",
+            user_id = %user.id,
+            "User logged in successfully"
+        );
+
+        res
     }
 
     /// Logout user by blacklisting their tokens
@@ -267,6 +319,8 @@ where
                 self.blacklist_repository.add(jti, exp).await?;
             }
         }
+
+        tracing::info!(event = "AUTH_LOGOUT", "User logged out successfully");
 
         Ok(())
     }
@@ -301,6 +355,12 @@ where
             self.jwt_service
                 .generate_access_token(user_id, role_names, permission_names)?;
 
+        tracing::debug!(
+            event = "AUTH_TOKEN_REFRESH",
+            user_id = %user_id,
+            "Access token refreshed"
+        );
+
         Ok(access_token)
     }
 
@@ -331,7 +391,11 @@ where
             .await?;
 
         // In a real app, send email here
-        tracing::info!("Password reset token for user {}: {}", user.id, "...");
+        tracing::info!(
+            event = "AUTH_PASSWORD_RESET_REQUESTED",
+            user_id = %user.id,
+            "Password reset token generated"
+        );
 
         Ok(())
     }
@@ -358,6 +422,12 @@ where
         self.user_repository
             .update_password(user.id, password_hash)
             .await?;
+
+        tracing::info!(
+            event = "AUTH_PASSWORD_RESET_SUCCESS",
+            user_id = %user.id,
+            "Password reset successfully completed"
+        );
 
         Ok(())
     }
@@ -402,6 +472,12 @@ where
             .update_2fa_status(user_id, Some(secret), true, backup_codes_opt)
             .await?;
 
+        tracing::info!(
+            event = "AUTH_2FA_ENABLED",
+            user_id = %user_id,
+            "Two-factor authentication enabled"
+        );
+
         Ok(backup_codes)
     }
 
@@ -426,6 +502,12 @@ where
         self.user_repository
             .update_2fa_status(user_id, None, false, vec![])
             .await?;
+
+        tracing::info!(
+            event = "AUTH_2FA_DISABLED",
+            user_id = %user_id,
+            "Two-factor authentication disabled"
+        );
 
         Ok(())
     }
@@ -483,6 +565,12 @@ where
         let token_pair =
             self.jwt_service
                 .generate_token_pair(user.id, role_names, permission_names)?;
+
+        tracing::info!(
+            event = "AUTH_2FA_VERIFY_SUCCESS",
+            user_id = %user.id,
+            "MFA verification successful"
+        );
 
         Ok((token_pair.access_token, token_pair.refresh_token))
     }
