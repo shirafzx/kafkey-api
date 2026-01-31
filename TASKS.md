@@ -69,11 +69,7 @@
 - [x] Create initial API documentation
 - [x] Create technical walkthrough
 
----
-
-## 🚧 In Progress / TODO
-
-### Security Enhancements
+### Phase 9: Security Enhancements
 
 - [x] Add global rate limiting for all endpoints
 - [x] Implement token blacklist for logout functionality
@@ -83,6 +79,10 @@
 - [x] Add two-factor authentication (2FA) support
 - [x] Implement CSRF protection
 - [x] Implement Request Validation
+
+---
+
+## 🚧 In Progress / TODO
 
 ### Performance & Optimization
 
