@@ -10,7 +10,9 @@ use axum::{
 use uuid::Uuid;
 
 use crate::application::use_cases::audit::AuditUseCases;
-use crate::domain::repositories::audit_repository::AuditRepository;
+use crate::domain::{
+    entities::user::AdminUpdateUserParams, repositories::audit_repository::AuditRepository,
+};
 use crate::{
     api::axum_http::extractors::ValidatedJson,
     api::axum_http::middleware::{require_permission, require_role},
@@ -270,17 +272,13 @@ async fn admin_update_user<AR: AuditRepository + 'static>(
         .admin_update_user(
             actor_id,
             id,
-            request.display_name,
-            request.avatar_image_url,
-            request.is_active,
-            request.is_verified,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            AdminUpdateUserParams {
+                display_name: request.display_name,
+                avatar_image_url: request.avatar_image_url,
+                is_active: request.is_active,
+                is_verified: request.is_verified,
+                ..Default::default()
+            },
         )
         .await
     {

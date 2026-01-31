@@ -35,17 +35,7 @@ pub trait UserRepository {
     async fn admin_update(
         &self,
         user_id: Uuid,
-        display_name: Option<String>,
-        avatar_image_url: Option<String>,
-        is_active: Option<bool>,
-        is_verified: Option<bool>,
-        verification_token: Option<Option<String>>,
-        verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
-        password_reset_token: Option<Option<String>>,
-        password_reset_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
-        two_factor_secret: Option<Option<String>>,
-        two_factor_enabled: Option<bool>,
-        two_factor_backup_codes: Option<Option<Vec<Option<String>>>>,
+        params: crate::domain::entities::user::AdminUpdateUserParams,
     ) -> Result<()>;
 
     async fn find_all(&self) -> Result<Vec<UserEntity>>;

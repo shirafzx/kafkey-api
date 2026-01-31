@@ -10,21 +10,30 @@ use axum::{
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 
 use crate::application::use_cases::audit::AuditUseCases;
+use crate::application::use_cases::auth::AuthUseCases;
+use crate::application::use_cases::users::UserUseCases;
 use crate::domain::repositories::audit_repository::AuditRepository;
+use crate::infrastructure::database::postgres::repositories::blacklist_repository::BlacklistPostgres;
+use crate::infrastructure::database::postgres::repositories::cached_user_repository::CachedUserRepository;
+use crate::infrastructure::database::postgres::repositories::role_repository::RolePostgres;
+use crate::infrastructure::database::postgres::repositories::user_repository::UserPostgres;
+
+type UserUseCaseType<AR> = UserUseCases<CachedUserRepository<UserPostgres>, AR>;
+type AuthUseCaseType =
+    AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>;
+type AuthState<AR> = (
+    Arc<UserUseCaseType<AR>>,
+    Arc<AuthUseCaseType>,
+    Arc<RolePostgres>,
+);
+
 use crate::{
     api::axum_http::extractors::ValidatedJson,
     application::dtos::{
         AuthResponse, ConfirmMfaRequest, Disable2faRequest, LoginRequest, RefreshTokenRequest,
         RegisterRequest, TotpSetupResponse, VerifyMfaRequest,
     },
-    application::use_cases::{auth::AuthUseCases, users::UserUseCases},
-    infrastructure::database::postgres::{
-        postgres_connection::PgPoolSquad,
-        repositories::{
-            blacklist_repository::BlacklistPostgres, cached_user_repository::CachedUserRepository,
-            role_repository::RolePostgres, user_repository::UserPostgres,
-        },
-    },
+    infrastructure::database::postgres::postgres_connection::PgPoolSquad,
     services::jwt_service::JwtService,
 };
 
@@ -73,11 +82,7 @@ pub fn routes<AR: AuditRepository + 'static>(
 }
 
 async fn register<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     ValidatedJson(request): ValidatedJson<RegisterRequest>,
 ) -> impl IntoResponse {
     match auth_use_case
@@ -105,11 +110,7 @@ async fn register<AR: AuditRepository + 'static>(
 }
 
 async fn login<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     ValidatedJson(request): ValidatedJson<LoginRequest>,
 ) -> impl IntoResponse {
     match auth_use_case
@@ -127,11 +128,7 @@ async fn login<AR: AuditRepository + 'static>(
 }
 
 async fn refresh_token<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Json(request): Json<RefreshTokenRequest>,
 ) -> impl IntoResponse {
     match auth_use_case.refresh_token(request.refresh_token).await {
@@ -150,11 +147,7 @@ async fn refresh_token<AR: AuditRepository + 'static>(
 }
 
 async fn logout<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     headers: axum::http::HeaderMap,
     Json(request): Json<RefreshTokenRequest>,
 ) -> impl IntoResponse {
@@ -195,11 +188,7 @@ async fn logout<AR: AuditRepository + 'static>(
 }
 
 async fn verify_email<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
     let token = match params.get("token") {
@@ -236,11 +225,7 @@ struct ResendVerificationRequest {
 }
 
 async fn resend_verification<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Json(request): Json<ResendVerificationRequest>,
 ) -> impl IntoResponse {
     match auth_use_case
@@ -268,11 +253,7 @@ struct ForgotPasswordRequest {
 }
 
 async fn forgot_password<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Json(request): Json<ForgotPasswordRequest>,
 ) -> impl IntoResponse {
     match auth_use_case.forgot_password(request.email).await {
@@ -300,11 +281,7 @@ struct ResetPasswordRequest {
 }
 
 async fn reset_password<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Json(request): Json<ResetPasswordRequest>,
 ) -> impl IntoResponse {
     match auth_use_case
@@ -326,11 +303,7 @@ async fn reset_password<AR: AuditRepository + 'static>(
 }
 
 async fn setup_2fa<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&claims.sub) {
@@ -364,11 +337,7 @@ async fn setup_2fa<AR: AuditRepository + 'static>(
 }
 
 async fn confirm_2fa<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
     Json(request): Json<ConfirmMfaRequest>,
 ) -> impl IntoResponse {
@@ -403,11 +372,7 @@ async fn confirm_2fa<AR: AuditRepository + 'static>(
 }
 
 async fn verify_2fa<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Json(request): Json<VerifyMfaRequest>,
 ) -> impl IntoResponse {
     let user_id = match Uuid::parse_str(&request.user_id) {
@@ -442,11 +407,7 @@ async fn verify_2fa<AR: AuditRepository + 'static>(
 }
 
 async fn disable_2fa<AR: AuditRepository + 'static>(
-    axum::extract::State((_, auth_use_case, _)): axum::extract::State<(
-        Arc<UserUseCases<CachedUserRepository<UserPostgres>, AR>>,
-        Arc<AuthUseCases<CachedUserRepository<UserPostgres>, RolePostgres, BlacklistPostgres>>,
-        Arc<RolePostgres>,
-    )>,
+    axum::extract::State((_, auth_use_case, _)): axum::extract::State<AuthState<AR>>,
     Extension(claims): Extension<crate::services::jwt_service::TokenClaims>,
     Json(request): Json<Disable2faRequest>,
 ) -> impl IntoResponse {

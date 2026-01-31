@@ -16,8 +16,7 @@ impl PaginationParams {
         let page_size = self
             .page_size
             .unwrap_or(DEFAULT_PAGE_SIZE)
-            .max(1)
-            .min(MAX_PAGE_SIZE);
+            .clamp(1, MAX_PAGE_SIZE);
         (page, page_size)
     }
 }

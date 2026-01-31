@@ -9,7 +9,7 @@ use crate::{
         entities::{
             permission::PermissionEntity,
             role::RoleEntity,
-            user::{NewUserEntity, UserEntity},
+            user::{AdminUpdateUserParams, NewUserEntity, UserEntity},
             user_role::NewUserRoleEntity,
         },
         repositories::user_repository::UserRepository,
@@ -167,36 +167,16 @@ impl UserRepository for UserPostgres {
     ) -> Result<()> {
         self.admin_update(
             user_id,
-            display_name_opt,
-            avatar_image_url_opt,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            AdminUpdateUserParams {
+                display_name: display_name_opt,
+                avatar_image_url: avatar_image_url_opt,
+                ..Default::default()
+            },
         )
         .await
     }
 
-    async fn admin_update(
-        &self,
-        user_id: Uuid,
-        display_name_opt: Option<String>,
-        avatar_image_url_opt: Option<String>,
-        is_active_opt: Option<bool>,
-        is_verified_opt: Option<bool>,
-        verification_token_opt: Option<Option<String>>,
-        verification_token_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
-        password_reset_token_opt: Option<Option<String>>,
-        password_reset_expires_at_opt: Option<Option<chrono::DateTime<chrono::Utc>>>,
-        two_factor_secret_opt: Option<Option<String>>,
-        two_factor_enabled_opt: Option<bool>,
-        two_factor_backup_codes_opt: Option<Option<Vec<Option<String>>>>,
-    ) -> Result<()> {
+    async fn admin_update(&self, user_id: Uuid, params: AdminUpdateUserParams) -> Result<()> {
         use crate::infrastructure::database::postgres::schema::users::dsl::*;
 
         let pool = Arc::clone(&self.db_pool);
@@ -205,67 +185,67 @@ impl UserRepository for UserPostgres {
             let mut conn = pool.get()?;
 
             conn.transaction::<_, anyhow::Error, _>(|conn| {
-                if let Some(name) = display_name_opt {
+                if let Some(name) = params.display_name {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(display_name.eq(name))
                         .execute(conn)?;
                 }
 
-                if let Some(avatar) = avatar_image_url_opt {
+                if let Some(avatar) = params.avatar_image_url {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(avatar_image_url.eq(Some(avatar)))
                         .execute(conn)?;
                 }
 
-                if let Some(active) = is_active_opt {
+                if let Some(active) = params.is_active {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(is_active.eq(Some(active)))
                         .execute(conn)?;
                 }
 
-                if let Some(verified) = is_verified_opt {
+                if let Some(verified) = params.is_verified {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(is_verified.eq(Some(verified)))
                         .execute(conn)?;
                 }
 
-                if let Some(token) = verification_token_opt {
+                if let Some(token) = params.verification_token {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(verification_token.eq(token))
                         .execute(conn)?;
                 }
 
-                if let Some(expires) = verification_token_expires_at_opt {
+                if let Some(expires) = params.verification_token_expires_at {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(verification_token_expires_at.eq(expires))
                         .execute(conn)?;
                 }
 
-                if let Some(token) = password_reset_token_opt {
+                if let Some(token) = params.password_reset_token {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(password_reset_token.eq(token))
                         .execute(conn)?;
                 }
 
-                if let Some(expires) = password_reset_expires_at_opt {
+                if let Some(expires) = params.password_reset_expires_at {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(password_reset_expires_at.eq(expires))
                         .execute(conn)?;
                 }
 
-                if let Some(token) = two_factor_secret_opt {
+                if let Some(token) = params.two_factor_secret {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(two_factor_secret.eq(token))
                         .execute(conn)?;
                 }
 
-                if let Some(enabled_val) = two_factor_enabled_opt {
+                if let Some(enabled_val) = params.two_factor_enabled {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(two_factor_enabled.eq(enabled_val))
                         .execute(conn)?;
                 }
 
-                if let Some(codes) = two_factor_backup_codes_opt {
+                if let Some(codes) = params.two_factor_backup_codes {
                     diesel::update(users.filter(id.eq(user_id)))
                         .set(two_factor_backup_codes.eq(codes))
                         .execute(conn)?;

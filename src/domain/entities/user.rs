@@ -41,3 +41,17 @@ pub struct NewUserEntity {
     pub verification_token: Option<String>,
     pub verification_token_expires_at: Option<DateTime<Utc>>,
 }
+#[derive(Debug, Clone, Default)]
+pub struct AdminUpdateUserParams {
+    pub display_name: Option<String>,
+    pub avatar_image_url: Option<String>,
+    pub is_active: Option<bool>,
+    pub is_verified: Option<bool>,
+    pub verification_token: Option<Option<String>>,
+    pub verification_token_expires_at: Option<Option<DateTime<Utc>>>,
+    pub password_reset_token: Option<Option<String>>,
+    pub password_reset_expires_at: Option<Option<DateTime<Utc>>>,
+    pub two_factor_secret: Option<Option<String>>,
+    pub two_factor_enabled: Option<bool>,
+    pub two_factor_backup_codes: Option<Option<Vec<Option<String>>>>,
+}

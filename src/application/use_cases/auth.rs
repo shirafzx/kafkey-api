@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     application::dtos::LoginResponse,
+    domain::entities::user::AdminUpdateUserParams,
     domain::repositories::{
         blacklist_repository::BlacklistRepository, role_repository::RoleRepository,
         user_repository::UserRepository,
@@ -103,10 +104,10 @@ where
             .ok_or_else(|| anyhow::anyhow!("Invalid or expired verification token"))?;
 
         // Check expiration
-        if let Some(expires_at) = user.verification_token_expires_at {
-            if chrono::Utc::now() > expires_at {
-                return Err(anyhow::anyhow!("Verification token has expired"));
-            }
+        if let Some(expires_at) = user.verification_token_expires_at
+            && chrono::Utc::now() > expires_at
+        {
+            return Err(anyhow::anyhow!("Verification token has expired"));
         }
 
         // Mark as verified
@@ -149,17 +150,11 @@ where
         self.user_repository
             .admin_update(
                 user.id,
-                None,
-                None,
-                None,
-                None,
-                Some(Some(verification_token)),
-                Some(Some(verification_token_expires_at)),
-                None,
-                None,
-                None,
-                None,
-                None,
+                AdminUpdateUserParams {
+                    verification_token: Some(Some(verification_token)),
+                    verification_token_expires_at: Some(Some(verification_token_expires_at)),
+                    ..Default::default()
+                },
             )
             .await?;
 
@@ -311,13 +306,13 @@ where
         }
 
         // Blacklist refresh token if provided
-        if let Some(rt) = refresh_token {
-            if let Ok(claims) = self.jwt_service.validate_refresh_token(&rt) {
-                let jti = Uuid::parse_str(&claims.jti)?;
-                let exp = DateTime::from_timestamp(claims.exp, 0)
-                    .ok_or_else(|| anyhow::anyhow!("Invalid expiration timestamp"))?;
-                self.blacklist_repository.add(jti, exp).await?;
-            }
+        if let Some(rt) = refresh_token
+            && let Ok(claims) = self.jwt_service.validate_refresh_token(&rt)
+        {
+            let jti = Uuid::parse_str(&claims.jti)?;
+            let exp = DateTime::from_timestamp(claims.exp, 0)
+                .ok_or_else(|| anyhow::anyhow!("Invalid expiration timestamp"))?;
+            self.blacklist_repository.add(jti, exp).await?;
         }
 
         tracing::info!(event = "AUTH_LOGOUT", "User logged out successfully");
@@ -376,17 +371,11 @@ where
         self.user_repository
             .admin_update(
                 user.id,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(Some(token)),
-                Some(Some(expires_at)),
-                None,
-                None,
-                None,
+                AdminUpdateUserParams {
+                    password_reset_token: Some(Some(token)),
+                    password_reset_expires_at: Some(Some(expires_at)),
+                    ..Default::default()
+                },
             )
             .await?;
 
@@ -409,10 +398,10 @@ where
             .ok_or_else(|| anyhow::anyhow!("Invalid or expired reset token"))?;
 
         // Check expiration
-        if let Some(expires_at) = user.password_reset_expires_at {
-            if chrono::Utc::now() > expires_at {
-                return Err(anyhow::anyhow!("Reset token has expired"));
-            }
+        if let Some(expires_at) = user.password_reset_expires_at
+            && chrono::Utc::now() > expires_at
+        {
+            return Err(anyhow::anyhow!("Reset token has expired"));
         }
 
         // Hash new password
@@ -534,14 +523,12 @@ where
             let mut found = false;
             let mut new_codes = Vec::new();
 
-            for c_opt in backup_codes {
-                if let Some(c) = c_opt {
-                    if c == code && !found {
-                        found = true;
-                        continue; // Consume this code
-                    }
-                    new_codes.push(Some(c));
+            for c in backup_codes.into_iter().flatten() {
+                if c == code && !found {
+                    found = true;
+                    continue; // Consume this code
                 }
+                new_codes.push(Some(c));
             }
 
             if !found {

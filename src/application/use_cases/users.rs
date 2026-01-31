@@ -4,7 +4,10 @@ use uuid::Uuid;
 
 use crate::application::use_cases::audit::AuditUseCases;
 use crate::domain::repositories::audit_repository::AuditRepository;
-use crate::domain::{entities::user::NewUserEntity, repositories::user_repository::UserRepository};
+use crate::domain::{
+    entities::user::{AdminUpdateUserParams, NewUserEntity},
+    repositories::user_repository::UserRepository,
+};
 
 pub struct UserUseCases<T, AR>
 where
@@ -196,33 +199,10 @@ where
         &self,
         actor_id: Uuid,
         user_id: Uuid,
-        display_name: Option<String>,
-        avatar_image_url: Option<String>,
-        is_active: Option<bool>,
-        is_verified: Option<bool>,
-        verification_token: Option<Option<String>>,
-        verification_token_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
-        password_reset_token: Option<Option<String>>,
-        password_reset_expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
-        two_factor_secret: Option<Option<String>>,
-        two_factor_enabled: Option<bool>,
-        two_factor_backup_codes: Option<Option<Vec<Option<String>>>>,
+        params: AdminUpdateUserParams,
     ) -> Result<()> {
         self.user_repository
-            .admin_update(
-                user_id,
-                display_name.clone(),
-                avatar_image_url,
-                is_active,
-                is_verified,
-                verification_token,
-                verification_token_expires_at,
-                password_reset_token,
-                password_reset_expires_at,
-                two_factor_secret,
-                two_factor_enabled,
-                two_factor_backup_codes,
-            )
+            .admin_update(user_id, params.clone())
             .await?;
 
         self.audit_use_case
@@ -233,9 +213,9 @@ where
                 "user",
                 "admin_update",
                 serde_json::json!({
-                    "display_name": display_name,
-                    "is_active": is_active,
-                    "is_verified": is_verified,
+                    "display_name": params.display_name,
+                    "is_active": params.is_active,
+                    "is_verified": params.is_verified,
                 }),
             )
             .await

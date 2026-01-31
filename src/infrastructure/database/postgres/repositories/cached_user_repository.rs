@@ -1,6 +1,5 @@
 use anyhow::{Ok, Result};
 use async_trait::async_trait;
-use chrono::Utc;
 use moka::future::Cache;
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,7 +9,7 @@ use crate::domain::{
     entities::{
         permission::PermissionEntity,
         role::RoleEntity,
-        user::{NewUserEntity, UserEntity},
+        user::{AdminUpdateUserParams, NewUserEntity, UserEntity},
     },
     repositories::user_repository::UserRepository,
 };
@@ -136,37 +135,8 @@ where
             .await
     }
 
-    async fn admin_update(
-        &self,
-        user_id: Uuid,
-        display_name: Option<String>,
-        avatar_image_url: Option<String>,
-        is_active: Option<bool>,
-        is_verified: Option<bool>,
-        verification_token: Option<Option<String>>,
-        verification_token_expires_at: Option<Option<chrono::DateTime<Utc>>>,
-        password_reset_token: Option<Option<String>>,
-        password_reset_expires_at: Option<Option<chrono::DateTime<Utc>>>,
-        two_factor_secret: Option<Option<String>>,
-        two_factor_enabled: Option<bool>,
-        two_factor_backup_codes: Option<Option<Vec<Option<String>>>>,
-    ) -> Result<()> {
-        self.inner
-            .admin_update(
-                user_id,
-                display_name,
-                avatar_image_url,
-                is_active,
-                is_verified,
-                verification_token,
-                verification_token_expires_at,
-                password_reset_token,
-                password_reset_expires_at,
-                two_factor_secret,
-                two_factor_enabled,
-                two_factor_backup_codes,
-            )
-            .await
+    async fn admin_update(&self, user_id: Uuid, params: AdminUpdateUserParams) -> Result<()> {
+        self.inner.admin_update(user_id, params).await
     }
 
     async fn find_all(&self) -> Result<Vec<UserEntity>> {
