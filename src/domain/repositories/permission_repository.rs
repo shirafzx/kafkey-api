@@ -17,4 +17,17 @@ pub trait PermissionRepository {
         description: Option<String>,
     ) -> Result<()>;
     async fn delete(&self, id: Uuid) -> Result<()>;
+
+    // Tenant-scoped methods
+    async fn find_by_id_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<PermissionEntity>;
+    async fn find_by_name_scoped(&self, name: String, tenant_id: Uuid) -> Result<PermissionEntity>;
+    async fn find_all_by_tenant(&self, tenant_id: Uuid) -> Result<Vec<PermissionEntity>>;
+    async fn update_scoped(
+        &self,
+        id: Uuid,
+        tenant_id: Uuid,
+        name: Option<String>,
+        description: Option<String>,
+    ) -> Result<()>;
+    async fn delete_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<()>;
 }

@@ -59,4 +59,17 @@ pub trait UserRepository: Send + Sync {
         enabled: bool,
         backup_codes: Vec<Option<String>>,
     ) -> Result<()>;
+
+    // Tenant-scoped methods for multi-tenancy
+    async fn find_by_id_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<UserEntity>;
+    async fn find_by_email_scoped(&self, email: String, tenant_id: Uuid) -> Result<UserEntity>;
+    async fn find_all_by_tenant(&self, tenant_id: Uuid) -> Result<Vec<UserEntity>>;
+    async fn find_paginated_by_tenant(
+        &self,
+        tenant_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<UserEntity>>;
+    async fn count_by_tenant(&self, tenant_id: Uuid) -> Result<i64>;
+    async fn delete_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<()>;
 }

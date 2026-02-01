@@ -1,8 +1,13 @@
+pub mod api_key;
 pub mod audit_log;
 pub mod blacklisted_token;
 pub mod permission;
 pub mod role;
 pub mod role_permission;
+pub mod tenant;
+pub mod tenant_admin;
+pub mod tenant_settings;
 pub mod user;
+pub mod webhook;
 pub mod user_role;
 pub mod user_social_account;

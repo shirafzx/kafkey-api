@@ -28,6 +28,7 @@ pub struct UserEntity {
     pub two_factor_secret: Option<String>,
     pub two_factor_enabled: bool,
     pub two_factor_backup_codes: Option<Vec<Option<String>>>,
+    pub tenant_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -38,6 +39,7 @@ pub struct NewUserEntity {
     pub avatar_image_url: Option<String>,
     pub password_hash: String,
     pub email: String,
+    pub tenant_id: Option<Uuid>,
     pub verification_token: Option<String>,
     pub verification_token_expires_at: Option<DateTime<Utc>>,
 }

@@ -128,11 +128,43 @@
 - [x] Create API routes for OAuth2 login and callbacks
 - [x] Add environment configuration for OAuth2 credentials
 
+### Phase 16: Multi-Tenancy & Authentication-as-a-Service
+
+- [x] Create `tenant_admins` table migration (service customers)
+- [x] Create `tenants` table migration (applications/organizations)
+- [x] Create `api_keys` table migration (tenant authentication)
+- [x] Create `tenant_settings` table migration (customizable configurations)
+- [x] Add `tenant_id` column to `users`, `roles`, and `permissions` tables
+- [x] Create TenantAdmin domain entity
+- [x] Create Tenant domain entity
+- [x] Create ApiKey domain entity
+- [x] Create TenantSettings domain entity
+- [x] Update User entity with `tenant_id` field
+- [x] Create TenantAdminRepository trait and implementation
+- [x] Create TenantRepository trait and implementation
+- [x] Create ApiKeyRepository trait and implementation
+- [x] Create TenantSettingsRepository trait and implementation
+- [x] Update UserRepository to support tenant-scoped queries
+- [x] Update RoleRepository to support tenant-scoped queries
+- [x] Update PermissionRepository to support tenant-scoped queries
+- [x] Create API key generation and validation service
+- [x] Create tenant context middleware (extract tenant from API key)
+- [x] Create tenant management use cases
+- [x] Create API key management use cases
+- [x] Create tenant admin authentication endpoints
+- [x] Create tenant management API endpoints
+- [x] Create API key management endpoints
+- [ ] Build JavaScript/TypeScript SDK
+- [ ] Build React integration components
+- [x] Implement webhook system for tenant events
+- [x] Add per-tenant rate limiting
+- [ ] Create organization/team support
+
 ---
 
 ## 🚧 In Progress / TODO
 
-- [ ] Multi-tenancy support
+- [x] Multi-tenancy support (Phase 16 - Database schema complete, repositories in progress)
 - [ ] WebSocket support for real-time notifications
 
 ---

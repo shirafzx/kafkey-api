@@ -39,3 +39,6 @@ sentry-tower = "0.36"
 mongodb = { version = "3.1" }
 oauth2 = "5.0.0"
 reqwest = { version = "0.13.1", features = ["json"] }
+hex = "0.4"
+hmac = "0.12.1"
+sha2 = "0.10.9"

@@ -93,9 +93,9 @@ impl OAuth2UseCases {
                 .await?;
 
             let user = self.user_repo.find_by_id(existing_account.user_id).await?;
-            let token = self
-                .jwt_service
-                .generate_access_token(user.id, vec![], vec![])?;
+            let token =
+                self.jwt_service
+                    .generate_access_token(user.id, vec![], vec![], user.tenant_id)?;
             return Ok((token, user));
         }
 
@@ -122,6 +122,7 @@ impl OAuth2UseCases {
                     password_hash: String::new(), // No password for OAuth users
                     display_name: google_user.name.clone(),
                     avatar_image_url: google_user.picture.clone(),
+                    tenant_id: None, // TODO: Set tenant_id from API key context
                     verification_token: None,
                     verification_token_expires_at: None,
                 };
@@ -149,9 +150,9 @@ impl OAuth2UseCases {
             .await?;
 
         // Generate JWT
-        let token = self
-            .jwt_service
-            .generate_access_token(user.id, vec![], vec![])?;
+        let token =
+            self.jwt_service
+                .generate_access_token(user.id, vec![], vec![], user.tenant_id)?;
         Ok((token, user))
     }
 
@@ -205,9 +206,9 @@ impl OAuth2UseCases {
                 .await?;
 
             let user = self.user_repo.find_by_id(existing_account.user_id).await?;
-            let token = self
-                .jwt_service
-                .generate_access_token(user.id, vec![], vec![])?;
+            let token =
+                self.jwt_service
+                    .generate_access_token(user.id, vec![], vec![], user.tenant_id)?;
             return Ok((token, user));
         }
 
@@ -232,6 +233,7 @@ impl OAuth2UseCases {
                         .name
                         .unwrap_or_else(|| github_user.login.clone()),
                     avatar_image_url: github_user.avatar_url,
+                    tenant_id: None, // TODO: Set tenant_id from API key context
                     verification_token: None,
                     verification_token_expires_at: None,
                 };
@@ -259,9 +261,9 @@ impl OAuth2UseCases {
             .await?;
 
         // Generate JWT
-        let token = self
-            .jwt_service
-            .generate_access_token(user.id, vec![], vec![])?;
+        let token =
+            self.jwt_service
+                .generate_access_token(user.id, vec![], vec![], user.tenant_id)?;
         Ok((token, user))
     }
 }

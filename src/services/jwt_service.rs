@@ -12,6 +12,7 @@ pub struct TokenClaims {
     pub iat: i64,    // Issued at
     pub roles: Vec<String>,
     pub permissions: Vec<String>,
+    pub tenant_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,6 +40,7 @@ impl JwtService {
         user_id: Uuid,
         roles: Vec<String>,
         permissions: Vec<String>,
+        tenant_id: Option<Uuid>,
     ) -> Result<String> {
         let now = Utc::now();
         let expiry = now + Duration::minutes(15);
@@ -50,6 +52,7 @@ impl JwtService {
             iat: now.timestamp(),
             roles,
             permissions,
+            tenant_id: tenant_id.map(|id| id.to_string()),
         };
 
         let token = encode(
@@ -73,6 +76,7 @@ impl JwtService {
             iat: now.timestamp(),
             roles: vec![],
             permissions: vec![],
+            tenant_id: None,
         };
 
         let token = encode(
@@ -90,8 +94,9 @@ impl JwtService {
         user_id: Uuid,
         roles: Vec<String>,
         permissions: Vec<String>,
+        tenant_id: Option<Uuid>,
     ) -> Result<TokenPair> {
-        let access_token = self.generate_access_token(user_id, roles, permissions)?;
+        let access_token = self.generate_access_token(user_id, roles, permissions, tenant_id)?;
         let refresh_token = self.generate_refresh_token(user_id)?;
 
         Ok(TokenPair {

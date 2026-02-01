@@ -67,6 +67,7 @@ where
             display_name,
             avatar_image_url,
             password_hash,
+            tenant_id: None, // TODO: Set tenant_id from API key context
             verification_token,
             verification_token_expires_at,
         };
@@ -272,9 +273,12 @@ where
         }
 
         // Generate tokens
-        let token_pair =
-            self.jwt_service
-                .generate_token_pair(user.id, role_names, permission_names)?;
+        let token_pair = self.jwt_service.generate_token_pair(
+            user.id,
+            role_names,
+            permission_names,
+            user.tenant_id,
+        )?;
 
         let res = Ok(LoginResponse::Success(
             crate::application::dtos::AuthResponse {
@@ -346,9 +350,12 @@ where
         let permission_names: Vec<String> = permissions.iter().map(|p| p.name.clone()).collect();
 
         // Generate new access token
-        let access_token =
-            self.jwt_service
-                .generate_access_token(user_id, role_names, permission_names)?;
+        let access_token = self.jwt_service.generate_access_token(
+            user_id,
+            role_names,
+            permission_names,
+            user.tenant_id,
+        )?;
 
         tracing::debug!(
             event = "AUTH_TOKEN_REFRESH",
@@ -549,9 +556,12 @@ where
         let permission_names: Vec<String> = permissions.iter().map(|p| p.name.clone()).collect();
 
         // Generate tokens
-        let token_pair =
-            self.jwt_service
-                .generate_token_pair(user.id, role_names, permission_names)?;
+        let token_pair = self.jwt_service.generate_token_pair(
+            user.id,
+            role_names,
+            permission_names,
+            user.tenant_id,
+        )?;
 
         tracing::info!(
             event = "AUTH_2FA_VERIFY_SUCCESS",

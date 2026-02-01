@@ -1,5 +1,9 @@
+pub mod api_key;
 pub mod auth;
 pub mod oauth2;
 pub mod permissions;
 pub mod roles;
+pub mod tenant;
+pub mod tenant_admin;
 pub mod users;
+pub mod webhook;

@@ -1,6 +1,11 @@
+pub mod api_key_repository;
 pub mod audit_repository;
 pub mod blacklist_repository;
 pub mod permission_repository;
 pub mod role_repository;
+pub mod tenant_admin_repository;
+pub mod tenant_repository;
+pub mod tenant_settings_repository;
 pub mod user_repository;
+pub mod webhook_repository;
 pub mod user_social_account_repository;

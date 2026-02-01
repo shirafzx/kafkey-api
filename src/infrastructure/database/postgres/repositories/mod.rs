@@ -1,6 +1,11 @@
 pub mod blacklist_repository;
 pub mod cached_user_repository;
 pub mod permission_repository;
+pub mod postgres_api_key_repository;
+pub mod postgres_tenant_admin_repository;
+pub mod postgres_tenant_repository;
+pub mod postgres_tenant_settings_repository;
 pub mod role_repository;
 pub mod user_repository;
 pub mod user_social_account_repository;
+pub mod webhook_repository;

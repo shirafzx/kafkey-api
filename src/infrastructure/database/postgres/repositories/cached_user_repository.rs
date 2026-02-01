@@ -182,4 +182,40 @@ where
             .update_2fa_status(id, secret, enabled, backup_codes)
             .await
     }
+
+    // Tenant-scoped methods - Pass through to inner
+    async fn find_by_id_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<UserEntity> {
+        self.inner.find_by_id_scoped(id, tenant_id).await
+    }
+
+    async fn find_by_email_scoped(&self, email: String, tenant_id: Uuid) -> Result<UserEntity> {
+        self.inner.find_by_email_scoped(email, tenant_id).await
+    }
+
+    async fn find_all_by_tenant(&self, tenant_id: Uuid) -> Result<Vec<UserEntity>> {
+        self.inner.find_all_by_tenant(tenant_id).await
+    }
+
+    async fn find_paginated_by_tenant(
+        &self,
+        tenant_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<UserEntity>> {
+        self.inner
+            .find_paginated_by_tenant(tenant_id, limit, offset)
+            .await
+    }
+
+    async fn count_by_tenant(&self, tenant_id: Uuid) -> Result<i64> {
+        self.inner.count_by_tenant(tenant_id).await
+    }
+
+    async fn delete_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<()> {
+        let result = self.inner.delete_scoped(id, tenant_id).await;
+        if result.is_ok() {
+            self.invalidate_permissions(id).await;
+        }
+        result
+    }
 }

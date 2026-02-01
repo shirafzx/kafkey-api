@@ -362,4 +362,76 @@ impl UserRepository for UserPostgres {
 
         Ok(())
     }
+
+    // Tenant-scoped methods
+    async fn find_by_id_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<UserEntity> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::id.eq(id))
+            .filter(users::tenant_id.eq(tenant_id))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn find_by_email_scoped(&self, email: String, tenant_id: Uuid) -> Result<UserEntity> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::email.eq(email))
+            .filter(users::tenant_id.eq(tenant_id))
+            .select(UserEntity::as_select())
+            .first::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn find_all_by_tenant(&self, tenant_id: Uuid) -> Result<Vec<UserEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::tenant_id.eq(tenant_id))
+            .select(UserEntity::as_select())
+            .load::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn find_paginated_by_tenant(
+        &self,
+        tenant_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<UserEntity>> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let result = users::table
+            .filter(users::tenant_id.eq(tenant_id))
+            .select(UserEntity::as_select())
+            .limit(limit)
+            .offset(offset)
+            .load::<UserEntity>(&mut conn)?;
+
+        Ok(result)
+    }
+
+    async fn count_by_tenant(&self, tenant_id: Uuid) -> Result<i64> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        let total = users::table
+            .filter(users::tenant_id.eq(tenant_id))
+            .count()
+            .get_result::<i64>(&mut conn)?;
+
+        Ok(total)
+    }
+
+    async fn delete_scoped(&self, id: Uuid, tenant_id: Uuid) -> Result<()> {
+        let mut conn = Arc::clone(&self.db_pool).get()?;
+        diesel::delete(
+            users::table
+                .filter(users::id.eq(id))
+                .filter(users::tenant_id.eq(tenant_id)),
+        )
+        .execute(&mut conn)?;
+
+        Ok(())
+    }
 }

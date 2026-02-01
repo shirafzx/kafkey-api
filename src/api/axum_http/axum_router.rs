@@ -14,12 +14,14 @@ use tracing::info;
 
 use crate::api::axum_http::{default_routers, middleware, routers};
 use crate::application::use_cases::audit::AuditUseCases;
+use crate::application::use_cases::webhook::WebhookUseCases;
 use crate::config::{config_loader, config_model::DotEnvyConfig};
 use crate::domain::repositories::blacklist_repository::BlacklistRepository;
 use crate::infrastructure::database::mongodb::repositories::audit_repository::AuditMongodb;
 use crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad;
 use crate::services::jwt_service::JwtService;
 use crate::services::oauth2_service::OAuth2Service;
+use crate::services::webhook_service::WebhookService;
 
 pub async fn start(
     config: Arc<DotEnvyConfig>,
@@ -80,78 +82,100 @@ pub async fn start(
         oauth2_configs.github_redirect_url,
     ));
 
-    let app = Router::new()
-        .fallback(default_routers::not_found)
-        .route("/metrics", get(|| async move { metric_handle.render() }))
-        .merge(routers::auth::routes(
+    // Initialize Webhook components
+    let webhook_repository = Arc::new(
+        crate::infrastructure::database::postgres::repositories::webhook_repository::WebhookPostgres::new(
             Arc::clone(&db_pool),
-            Arc::clone(&jwt_service),
-            Arc::clone(&audit_use_cases),
-        ))
-        .merge(routers::oauth2::routes(
-            Arc::clone(&db_pool),
-            Arc::clone(&jwt_service),
-            Arc::clone(&oauth2_service),
-        ))
-        .merge(
-            routers::users::routes(Arc::clone(&db_pool), Arc::clone(&audit_use_cases))
-                .merge(routers::roles::routes(
-                    Arc::clone(&db_pool),
-                    Arc::clone(&audit_use_cases),
-                ))
-                .merge(routers::permissions::routes(
-                    Arc::clone(&db_pool),
-                    Arc::clone(&audit_use_cases),
-                ))
-                .layer(axum::middleware::from_fn(move |req, next| {
-                    let jwt_service = Arc::clone(&jwt_service);
-                    let blacklist_repository = Arc::clone(&blacklist_repository);
-                    async move {
-                        middleware::auth_middleware(jwt_service, blacklist_repository, req, next)
+        ),
+    );
+    let webhook_service = WebhookService::new(Arc::clone(&webhook_repository)
+        as Arc<dyn crate::domain::repositories::webhook_repository::WebhookRepository>);
+    let webhook_use_cases = Arc::new(WebhookUseCases::new(
+        Arc::clone(&webhook_repository)
+            as Arc<dyn crate::domain::repositories::webhook_repository::WebhookRepository>,
+        webhook_service.clone(),
+    ));
+
+    let app =
+        Router::new()
+            .fallback(default_routers::not_found)
+            .route("/metrics", get(|| async move { metric_handle.render() }))
+            .merge(routers::auth::routes(
+                Arc::clone(&db_pool),
+                Arc::clone(&jwt_service),
+                Arc::clone(&audit_use_cases),
+            ))
+            .merge(routers::oauth2::routes(
+                Arc::clone(&db_pool),
+                Arc::clone(&jwt_service),
+                Arc::clone(&oauth2_service),
+            ))
+            .merge(
+                routers::users::routes(Arc::clone(&db_pool), Arc::clone(&audit_use_cases))
+                    .merge(routers::roles::routes(
+                        Arc::clone(&db_pool),
+                        Arc::clone(&audit_use_cases),
+                    ))
+                    .merge(routers::permissions::routes(
+                        Arc::clone(&db_pool),
+                        Arc::clone(&audit_use_cases),
+                    ))
+                    .merge(routers::webhook::webhook_router(Arc::clone(
+                        &webhook_use_cases,
+                    )))
+                    .layer(axum::middleware::from_fn(
+                        middleware::tenant_rate_limiter::tenant_rate_limiter_middleware,
+                    ))
+                    .layer(axum::middleware::from_fn(move |req, next| {
+                        let jwt_service = Arc::clone(&jwt_service);
+                        let blacklist_repository = Arc::clone(&blacklist_repository);
+                        async move {
+                            middleware::auth_middleware(
+                                jwt_service,
+                                blacklist_repository,
+                                req,
+                                next,
+                            )
                             .await
-                    }
-                })),
-        )
-        .route("/health-check", get(default_routers::health_check))
-        .layer(prometheus_layer)
-        .layer(sentry_tower::SentryHttpLayer::with_transaction())
-        .layer(axum::middleware::from_fn(middleware::csrf_middleware))
-        .layer(axum::middleware::from_fn(move |req, next| {
-            let state = Arc::clone(&rate_limit_state);
-            async move {
-                middleware::rate_limit_middleware::rate_limit_middleware(
-                    rate_limit_config,
-                    state,
-                    req,
-                    next,
-                )
-                .await
-            }
-        }))
-        .layer(axum::middleware::from_fn(
-            middleware::request_id::request_id_middleware,
-        ))
-        .layer(TimeoutLayer::with_status_code(
-            StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(config.server.timeout),
-        ))
-        .layer(RequestBodyLimitLayer::new(
-            (config.server.body_limit * 1024 * 1024)
-                .try_into()
-                .expect("body limit too large"),
-        ))
-        .layer(
-            CorsLayer::new()
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::PATCH,
-                    Method::DELETE,
-                ])
-                .allow_origin(Any),
-        )
-        .layer(TraceLayer::new_for_http());
+                        }
+                    })),
+            )
+            .route("/health-check", get(default_routers::health_check))
+            .layer(prometheus_layer)
+            .layer(sentry_tower::SentryHttpLayer::with_transaction())
+            .layer(axum::middleware::from_fn(
+                middleware::csrf_middleware::csrf_middleware,
+            ))
+            .layer(axum::middleware::from_fn(move |req, next| {
+                let state = Arc::clone(&rate_limit_state);
+                async move {
+                    middleware::rate_limit_middleware(rate_limit_config, state, req, next).await
+                }
+            }))
+            .layer(axum::middleware::from_fn(
+                middleware::request_id::request_id_middleware,
+            ))
+            .layer(TimeoutLayer::with_status_code(
+                StatusCode::REQUEST_TIMEOUT,
+                Duration::from_secs(config.server.timeout),
+            ))
+            .layer(RequestBodyLimitLayer::new(
+                (config.server.body_limit * 1024 * 1024)
+                    .try_into()
+                    .expect("body limit too large"),
+            ))
+            .layer(
+                CorsLayer::new()
+                    .allow_methods([
+                        Method::GET,
+                        Method::POST,
+                        Method::PUT,
+                        Method::PATCH,
+                        Method::DELETE,
+                    ])
+                    .allow_origin(Any),
+            )
+            .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
 
