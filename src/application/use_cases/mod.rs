@@ -4,3 +4,6 @@ pub mod oauth2;
 pub mod permissions;
 pub mod roles;
 pub mod users;
+
+#[cfg(test)]
+mod tests;
