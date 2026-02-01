@@ -574,3 +574,134 @@ Delete a permission. Requires `permissions.delete` permission.
 
 **GET /health-check**
 Returns a `200 OK` with system health status.
+
+---
+
+### OAuth2 Authentication
+
+Kafkey API supports OAuth2 authentication with Google and GitHub, allowing users to sign in using their existing accounts.
+
+#### Security Features
+
+- **Email Verification Required**: Only auto-links OAuth accounts to existing users if the user's email is already verified.
+- **CSRF Protection**: State token validation prevents cross-site request forgery attacks.
+- **PKCE Support**: Google OAuth uses Proof Key for Code Exchange (PKCE) for enhanced security.
+
+#### Account Linking Logic
+
+When a user authenticates via OAuth2:
+
+1. **Existing OAuth Account**: If the social account is already linked, update tokens and log in.
+2. **Email Match + Verified**: If email matches an existing verified user, link the social account.
+3. **Email Not Verified**: Reject auto-linking for security (user must verify email manually first or login with credentials).
+4. **New User**: Create a new account and link the social login.
+
+---
+
+#### GET /auth/oauth2/google/login
+
+Initiate Google OAuth2 authentication flow.
+
+**Response Data:**
+
+```json
+{
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "state": "csrf-state-token",
+  "pkceVerifier": "pkce-verifier-string"
+}
+```
+
+**Usage:**
+
+1. Call this endpoint to get the authorization URL.
+2. Store the `state` and `pkceVerifier` (in production, use session/Redis).
+3. Redirect user to `authUrl`.
+4. User authenticates with Google and is redirected to the callback URL.
+
+---
+
+#### GET /auth/oauth2/google/callback
+
+Handle Google OAuth2 callback and complete authentication.
+
+**Query Parameters:**
+
+- `code`: Authorization code from Google.
+- `state`: CSRF state token.
+- `expected_state`: The state value you stored (for validation).
+- `pkce_verifier`: The PKCE verifier you stored.
+
+> [!NOTE]
+> In production, `expected_state` and `pkce_verifier` should be retrieved from server-side session storage, not passed as query parameters from the client.
+
+**Response Data:**
+
+```json
+{
+  "accessToken": "jwt-access-token",
+  "user": {
+    "id": "uuid",
+    "username": "google_12345678",
+    "email": "user@gmail.com",
+    "displayName": "John Doe",
+    "avatarImageUrl": "https://lh3.googleusercontent.com/...",
+    "isActive": true,
+    "isVerified": true
+  }
+}
+```
+
+---
+
+#### GET /auth/oauth2/github/login
+
+Initiate GitHub OAuth2 authentication flow.
+
+**Response Data:**
+
+```json
+{
+  "authUrl": "https://github.com/login/oauth/authorize?...",
+  "state": "csrf-state-token"
+}
+```
+
+**Usage:**
+
+1. Call this endpoint to get the authorization URL.
+2. Store the `state` (in production, use session/Redis).
+3. Redirect user to `authUrl`.
+4. User authenticates with GitHub and is redirected to the callback URL.
+
+---
+
+#### GET /auth/oauth2/github/callback
+
+Handle GitHub OAuth2 callback and complete authentication.
+
+**Query Parameters:**
+
+- `code`: Authorization code from GitHub.
+- `state`: CSRF state token.
+- `expected_state`: The state value you stored (for validation).
+
+> [!NOTE]
+> In production, `expected_state` should be retrieved from server-side session storage.
+
+**Response Data:**
+
+```json
+{
+  "accessToken": "jwt-access-token",
+  "user": {
+    "id": "uuid",
+    "username": "githubuser",
+    "email": "user@example.com",
+    "displayName": "GitHub User",
+    "avatarImageUrl": "https://avatars.githubusercontent.com/u/...",
+    "isActive": true,
+    "isVerified": true
+  }
+}
+```

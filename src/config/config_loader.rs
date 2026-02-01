@@ -55,3 +55,24 @@ pub fn get_auth_secret_env() -> Result<AuthSecret> {
 
     Ok(authentication_secret)
 }
+
+pub fn get_oauth2_secrets_env() -> Result<crate::config::config_model::OAuth2Secrets> {
+    dotenvy::dotenv().ok();
+
+    let oauth2_secrets = crate::config::config_model::OAuth2Secrets {
+        google_client_id: std::env::var("GOOGLE_CLIENT_ID").expect("GOOGLE_CLIENT_ID is missing"),
+        google_client_secret: std::env::var("GOOGLE_CLIENT_SECRET")
+            .expect("GOOGLE_CLIENT_SECRET is missing"),
+        google_redirect_url: std::env::var("GOOGLE_REDIRECT_URL").unwrap_or_else(|_| {
+            "http://localhost:8080/api/v1/auth/oauth2/google/callback".to_string()
+        }),
+        github_client_id: std::env::var("GITHUB_CLIENT_ID").expect("GITHUB_CLIENT_ID is missing"),
+        github_client_secret: std::env::var("GITHUB_CLIENT_SECRET")
+            .expect("GITHUB_CLIENT_SECRET is missing"),
+        github_redirect_url: std::env::var("GITHUB_REDIRECT_URL").unwrap_or_else(|_| {
+            "http://localhost:8080/api/v1/auth/oauth2/github/callback".to_string()
+        }),
+    };
+
+    Ok(oauth2_secrets)
+}

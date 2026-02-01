@@ -25,3 +25,13 @@ pub struct AuthSecret {
     pub secret: String,
     pub refresh_secret: String,
 }
+
+#[derive(Debug, Clone)]
+pub struct OAuth2Secrets {
+    pub google_client_id: String,
+    pub google_client_secret: String,
+    pub google_redirect_url: String,
+    pub github_client_id: String,
+    pub github_client_secret: String,
+    pub github_redirect_url: String,
+}

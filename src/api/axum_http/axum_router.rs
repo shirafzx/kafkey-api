@@ -19,6 +19,7 @@ use crate::domain::repositories::blacklist_repository::BlacklistRepository;
 use crate::infrastructure::database::mongodb::repositories::audit_repository::AuditMongodb;
 use crate::infrastructure::database::postgres::postgres_connection::PgPoolSquad;
 use crate::services::jwt_service::JwtService;
+use crate::services::oauth2_service::OAuth2Service;
 
 pub async fn start(
     config: Arc<DotEnvyConfig>,
@@ -67,6 +68,18 @@ pub async fn start(
     let audit_repository = Arc::new(AuditMongodb::new(&mongodb_client));
     let audit_use_cases = Arc::new(AuditUseCases::new(Arc::clone(&audit_repository)));
 
+    // Initialize OAuth2Service from environment variables
+    let oauth2_configs =
+        config_loader::get_oauth2_secrets_env().expect("Failed to load OAuth2 secrets");
+    let oauth2_service = Arc::new(OAuth2Service::new(
+        oauth2_configs.google_client_id,
+        oauth2_configs.google_client_secret,
+        oauth2_configs.google_redirect_url,
+        oauth2_configs.github_client_id,
+        oauth2_configs.github_client_secret,
+        oauth2_configs.github_redirect_url,
+    ));
+
     let app = Router::new()
         .fallback(default_routers::not_found)
         .route("/metrics", get(|| async move { metric_handle.render() }))
@@ -74,6 +87,11 @@ pub async fn start(
             Arc::clone(&db_pool),
             Arc::clone(&jwt_service),
             Arc::clone(&audit_use_cases),
+        ))
+        .merge(routers::oauth2::routes(
+            Arc::clone(&db_pool),
+            Arc::clone(&jwt_service),
+            Arc::clone(&oauth2_service),
         ))
         .merge(
             routers::users::routes(Arc::clone(&db_pool), Arc::clone(&audit_use_cases))

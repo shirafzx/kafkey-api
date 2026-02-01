@@ -37,3 +37,5 @@ sentry = { version = "0.36", features = ["tower-axum-matched-path"] }
 sentry-tracing = "0.36"
 sentry-tower = "0.36"
 mongodb = { version = "3.1" }
+oauth2 = "5.0.0"
+reqwest = { version = "0.13.1", features = ["json"] }

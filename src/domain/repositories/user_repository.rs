@@ -9,7 +9,7 @@ use crate::domain::entities::{
 };
 
 #[async_trait]
-pub trait UserRepository {
+pub trait UserRepository: Send + Sync {
     async fn create(&self, new_user: NewUserEntity) -> Result<Uuid>;
     async fn find_by_id(&self, id: Uuid) -> Result<UserEntity>;
     async fn find_by_username(&self, username: String) -> Result<UserEntity>;

@@ -118,11 +118,20 @@
 - [x] Implement Docker image build check in CI using Buildx
 - [x] Optimize CI performance with `rust-cache` and Docker layer caching
 
+### Phase 15: OAuth2 Integration
+
+- [x] Implement OAuth2 authentication with Google and GitHub
+- [x] Create database schema for social accounts (`user_social_accounts` table)
+- [x] Implement OAuth2 domain entities and repository traits
+- [x] Create OAuth2Service using `oauth2` crate with PKCE support
+- [x] Implement secure account linking with email verification checks
+- [x] Create API routes for OAuth2 login and callbacks
+- [x] Add environment configuration for OAuth2 credentials
+
 ---
 
 ## 🚧 In Progress / TODO
 
-- [ ] OAuth2 integration (Google, GitHub, etc.)
 - [ ] Multi-tenancy support
 - [ ] WebSocket support for real-time notifications
 

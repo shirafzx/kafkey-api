@@ -51,6 +51,24 @@ diesel::table! {
 }
 
 diesel::table! {
+    user_social_accounts (id) {
+        id -> Uuid,
+        user_id -> Uuid,
+        #[max_length = 50]
+        provider -> Varchar,
+        #[max_length = 255]
+        provider_user_id -> Varchar,
+        #[max_length = 255]
+        provider_email -> Nullable<Varchar>,
+        access_token -> Nullable<Text>,
+        refresh_token -> Nullable<Text>,
+        expires_at -> Nullable<Timestamp>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     users (id) {
         id -> Uuid,
         #[max_length = 30]
@@ -87,6 +105,7 @@ diesel::joinable!(role_permissions -> permissions (permission_id));
 diesel::joinable!(role_permissions -> roles (role_id));
 diesel::joinable!(user_roles -> roles (role_id));
 diesel::joinable!(user_roles -> users (user_id));
+diesel::joinable!(user_social_accounts -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     blacklisted_tokens,
@@ -94,5 +113,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     role_permissions,
     roles,
     user_roles,
+    user_social_accounts,
     users,
 );
