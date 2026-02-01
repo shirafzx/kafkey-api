@@ -570,10 +570,60 @@ Delete a permission. Requires `permissions.delete` permission.
 
 ---
 
-### Health Check
+### Monitoring & Health
 
-**GET /health-check**
-Returns a `200 OK` with system health status.
+#### GET /health-check
+
+Returns system health status. This endpoint is excluded from rate limiting and metrics collection.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "code": "HEALTH_OK",
+  "message": "Service is healthy",
+  "data": {
+    "status": "healthy",
+    "timestamp": "2026-02-01T14:19:06Z"
+  },
+  "meta": {
+    "requestId": "uuid-v4",
+    "timestamp": "2026-02-01T14:19:06Z",
+    "version": "1.0"
+  }
+}
+```
+
+---
+
+#### GET /metrics
+
+Returns Prometheus-formatted metrics for monitoring. This endpoint is excluded from rate limiting and metrics collection to avoid recursive tracking.
+
+**Response Format:** Prometheus text exposition format
+
+**Metrics Include:**
+
+- HTTP request counts and durations
+- Response status code distributions
+- Active request counts
+- Custom application metrics
+
+**Example Output:**
+
+```
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/api/v1/users"} 1234
+
+# HELP http_request_duration_seconds HTTP request latency
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{method="POST",endpoint="/api/v1/auth/login",le="0.005"} 100
+```
+
+> [!NOTE]
+> This endpoint is typically used by Prometheus to scrape metrics. Configure your Prometheus server to poll this endpoint at your desired interval (e.g., every 15 seconds).
 
 ---
 
